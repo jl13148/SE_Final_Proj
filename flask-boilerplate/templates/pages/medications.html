@@ -1,0 +1,84 @@
+<!-- templates/pages/medications.html -->
+{% extends 'layouts/main.html' %}
+{% block title %}Medications - DiabetesEase{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        {% if is_personal %}
+            <!-- Personal Medications View -->
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>My Medications</h1>
+                <a href="{{ url_for('add_medication') }}" class="btn btn-primary">Add New Medication</a>
+            </div>
+            
+            {% if medications %}
+                <div class="row">
+                    {% for medication in medications %}
+                        <div class="col-md-4 mb-3">
+                            <div class="panel panel-default">
+                                <div class="panel-heading">
+                                    <h3 class="panel-title">{{ medication.name }}</h3>
+                                </div>
+                                <div class="panel-body">
+                                    <p><strong>Dosage:</strong> {{ medication.dosage }}</p>
+                                    <p><strong>Time:</strong> {{ medication.time.strftime('%I:%M %p') }}</p>
+                                    <p><strong>Frequency:</strong> {{ medication.frequency|replace('_', ' ')|title }}</p>
+                                    <form action="{{ url_for('delete_medication', id=medication.id) }}" method="POST" 
+                                          onsubmit="return confirm('Are you sure you want to delete this medication?');"
+                                          style="display: inline;">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    You haven't added any medications yet. Click "Add New Medication" to get started.
+                </div>
+            {% endif %}
+        {% else %}
+            <!-- Public View -->
+            <div class="jumbotron">
+                <h1>Diabetes Medication Management</h1>
+                <p class="lead">Track and manage your diabetes medications effectively with DiabetesEase.</p>
+                {% if not current_user.is_authenticated %}
+                    <p>
+                        <a href="{{ url_for('register') }}" class="btn btn-primary btn-lg">Sign Up to Track Your Medications</a>
+                        or
+                        <a href="{{ url_for('login') }}" class="btn btn-default btn-lg">Login</a>
+                    </p>
+                {% endif %}
+            </div>
+
+            <h2>Common Diabetes Medications</h2>
+            <p class="lead">Here are some common medications used in diabetes management:</p>
+            
+            <div class="row">
+                {% for medication in medications %}
+                    <div class="col-md-4 mb-3">
+                        <div class="panel panel-default">
+                            <div class="panel-heading">
+                                <h3 class="panel-title">{{ medication.name }}</h3>
+                            </div>
+                            <div class="panel-body">
+                                <p><strong>Typical Dosage:</strong> {{ medication.dosage }}</p>
+                                <p><strong>Common Schedule:</strong> {{ medication.frequency|replace('_', ' ')|title }}</p>
+                                <p><strong>Suggested Time:</strong> {{ medication.time.strftime('%I:%M %p') }}</p>
+                                <p class="text-muted">{{ medication.description }}</p>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+
+            <div class="alert alert-info mt-4">
+                <h4>Disclaimer</h4>
+                <p>The information provided is for educational purposes only. Always consult with your healthcare provider about your specific medication needs.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

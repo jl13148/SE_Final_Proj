@@ -1,0 +1,55 @@
+{% extends "layouts/form.html" %}
+{% block content %}
+<div class="container">
+    <h1>Add New Medication</h1>
+    <div class="row">
+        <div class="col-md-6">
+            <form method="POST" action="">
+                {{ form.hidden_tag() }}
+                <div class="mb-3">
+                    {{ form.name.label(class="form-label") }}
+                    {{ form.name(class="form-control") }}
+                    {% if form.name.errors %}
+                        {% for error in form.name.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    {{ form.dosage.label(class="form-label") }}
+                    {{ form.dosage(class="form-control") }}
+                    {% if form.dosage.errors %}
+                        {% for error in form.dosage.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    {{ form.frequency.label(class="form-label") }}
+                    {{ form.frequency(class="form-control") }}
+                    {% if form.frequency.errors %}
+                        {% for error in form.frequency.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    {{ form.time.label(class="form-label") }}
+                    {{ form.time(class="form-control", type="time") }}
+                    {% if form.time.errors %}
+                        {% for error in form.time.errors %}
+                            <span class="text-danger">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                {{ form.submit(class="btn btn-primary") }}
+                <a href="{{ url_for('medications') }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
