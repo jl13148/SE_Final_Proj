@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Insights</title>
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container py-5">
+        <h1 class="mb-4">Visual Insights</h1>
+
+        <!-- Glucose Level Chart -->
+        <div class="mb-5">
+            <h2>Glucose Levels</h2>
+            <canvas id="glucoseChart"></canvas>
+        </div>
+
+        <!-- Blood Pressure Chart -->
+        <div>
+            <h2>Blood Pressure</h2>
+            <canvas id="bloodPressureChart"></canvas>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            // Glucose Level Data
+            const glucoseData = {
+                labels: JSON.parse('{{ glucose_dates | tojson | safe }}'),
+                datasets: [{
+                    label: 'Glucose Level (mg/dL)',
+                    data: JSON.parse('{{ glucose_levels | tojson | safe }}'),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    fill: true,
+                }]
+            };
+
+            // Glucose Level Chart
+            const glucoseCtx = document.getElementById('glucoseChart').getContext('2d');
+            new Chart(glucoseCtx, {
+                type: 'line',
+                data: glucoseData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+
+            // Blood Pressure Data
+            const bloodPressureData = {
+                labels: JSON.parse('{{ blood_pressure_dates | tojson | safe }}'),
+                datasets: [
+                    {
+                        label: 'Systolic (mm Hg)',
+                        data: JSON.parse('{{ systolic_levels | tojson | safe }}'),
+                        borderColor: 'rgba(255, 99, 132, 1)',
+                        backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                        fill: true,
+                    },
+                    {
+                        label: 'Diastolic (mm Hg)',
+                        data: JSON.parse('{{ diastolic_levels | tojson | safe }}'),
+                        borderColor: 'rgba(54, 162, 235, 1)',
+                        backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                        fill: true,
+                    }
+                ]
+            };
+
+            // Blood Pressure Chart
+            const bloodPressureCtx = document.getElementById('bloodPressureChart').getContext('2d');
+            new Chart(bloodPressureCtx, {
+                type: 'line',
+                data: bloodPressureData,
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            type: 'time',
+                            time: {
+                                unit: 'day'
+                            }
+                        },
+                        y: {
+                            beginAtZero: true
+                        }
+                    }
+                }
+            });
+        });
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.5.4/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

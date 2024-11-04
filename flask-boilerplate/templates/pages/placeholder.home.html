@@ -52,19 +52,23 @@
 
             <!-- Health Logger -->
             <div class="col-md-4">
-                <div class="feature-card">
-                    <div class="icon-wrapper">
-                        <i class="fas fa-chart-line"></i>
+                <a href="{{ url_for('health_logger') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Health Logger</h3>
+                        <p>Track your glucose levels and health metrics with ease.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> Glucose tracking</li>
+                            <li><span class="check-icon">✓</span> Blood pressure log</li>
+                            <li><span class="check-icon">✓</span> Visual insights</li>
+                        </ul>
                     </div>
-                    <h3>Health Logger</h3>
-                    <p>Track your glucose levels and health metrics with ease.</p>
-                    <ul class="feature-list">
-                        <li><span class="check-icon">✓</span> Glucose tracking</li>
-                        <li><span class="check-icon">✓</span> Blood pressure log</li>
-                        <li><span class="check-icon">✓</span> Visual insights</li>
-                    </ul>
-                </div>
+                </a>
             </div>
+        </div>
+    </div>
 
             <!-- Health Reports -->
             <div class="col-md-4">
@@ -140,6 +144,17 @@
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
     transition: transform 0.3s ease, box-shadow 0.3s ease;
     height: 100%;
+}
+
+.feature-card-link {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+}
+
+.feature-card-link:visited,
+.feature-card-link:active {
+    color: inherit;
 }
 
 .feature-card:hover {

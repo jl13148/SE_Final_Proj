@@ -136,6 +136,84 @@ def delete_medication(id):
     flash('Medication deleted.')
     return redirect(url_for('medications'))
 
+
+# Jinting: Health Logger Function Implementation
+@app.route('/health-logger')
+@login_required
+def health_logger():
+    return render_template('pages/health_logger.html')
+
+@app.route('/health-logger/glucose')
+@login_required
+def glucose_logger():
+    return render_template('pages/glucose_logger.html')
+
+@app.route('/health-logger/blood_pressure')
+@login_required
+def blood_pressure_logger():
+    return render_template('pages/blood_pressure_logger.html')
+
+@app.route('/health-logger/visual_insights_page')
+@login_required
+def visual_insight_page():
+    return render_template('pages/visual_insights.html')
+
+class GlucoseRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    glucose_level = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.String(10), nullable=False)
+    time = db.Column(db.String(5), nullable=False)
+
+@app.route('/glucose', methods=['GET', 'POST'])
+def record_glucose():
+    if request.method == 'POST':
+        glucose_level = request.form['glucose_level']
+        date = request.form['date']
+        time = request.form['time']
+        new_record = GlucoseRecord(glucose_level=glucose_level, date=date, time=time)
+        db.session.add(new_record)
+        db.session.commit()
+        return redirect(url_for('glucose'))
+    return render_template('glucose_logger.html')
+
+class BloodPressureRecord(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    systolic = db.Column(db.Integer, nullable=False)
+    diastolic = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.String(10), nullable=False)
+    time = db.Column(db.String(5), nullable=False)
+
+@app.route('/blood_pressure', methods=['GET', 'POST'])
+def record_blood_pressure():
+    if request.method == 'POST':
+        systolic = request.form['systolic']
+        diastolic = request.form['diastolic']
+        date = request.form['date']
+        time = request.form['time']
+        new_record = BloodPressureRecord(systolic=systolic, diastolic=diastolic, date=date, time=time)
+        db.session.add(new_record)
+        db.session.commit()
+        return redirect(url_for('blood_pressure'))
+    return render_template('blood_pressure_logger.html')
+
+@app.route('/visual_insights')
+def visual_insights():
+    glucose_records = GlucoseRecord.query.all()
+    blood_pressure_records = BloodPressureRecord.query.all()
+
+    glucose_dates = [record.date for record in glucose_records]
+    glucose_levels = [record.glucose_level for record in glucose_records]
+
+    blood_pressure_dates = [record.date for record in blood_pressure_records]
+    systolic_levels = [record.systolic for record in blood_pressure_records]
+    diastolic_levels = [record.diastolic for record in blood_pressure_records]
+
+    return render_template('/pages/visual_insights.html',
+                           glucose_dates=glucose_dates,
+                           glucose_levels=glucose_levels,
+                           blood_pressure_dates=blood_pressure_dates,
+                           systolic_levels=systolic_levels,
+                           diastolic_levels=diastolic_levels)
 # @app.route('/login')
 # def login():
 #     form = LoginForm(request.form)
