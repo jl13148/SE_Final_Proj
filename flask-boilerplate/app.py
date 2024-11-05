@@ -209,8 +209,8 @@ def record_blood_pressure():
         new_record = BloodPressureRecord(systolic=systolic, diastolic=diastolic, date=date, time=time)
         db.session.add(new_record)
         db.session.commit()
-        return redirect(url_for('blood_pressure'))
-    return render_template('blood_pressure_logger.html')
+        return redirect(url_for('blood_pressure_logger'))
+    return render_template('pages/blood_pressure_logger.html')
 
 # @app.route('/visual_insights')
 # def visual_insights():
