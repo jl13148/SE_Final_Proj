@@ -3,6 +3,7 @@
 #----------------------------------------------------------------------------#
 
 from flask import Flask, render_template, request, flash, redirect, url_for
+from flask_migrate import Migrate
 # from flask.ext.sqlalchemy import SQLAlchemy
 from flask_sqlalchemy import SQLAlchemy
 import logging
@@ -13,7 +14,7 @@ import os
 from flask_login import login_required, current_user, LoginManager, login_user, logout_user
 
 # Import models and forms after initializing db
-from models import db, User, Medication
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord
 from forms import LoginForm, RegisterForm, ForgotForm, MedicationForm
 
 #----------------------------------------------------------------------------#
@@ -32,6 +33,8 @@ db.init_app(app)
 login_manager = LoginManager(app)
 login_manager.login_view = 'login'
 
+# Initialize Migrate
+migrate = Migrate(app, db)
 # Automatically tear down SQLAlchemy.
 '''
 @app.teardown_request
@@ -156,59 +159,61 @@ def blood_pressure_logger():
 @app.route('/health-logger/visual_insight_page')
 @login_required
 def visual_insight_page():
-    glucose_records = GlucoseRecord.query.all()
-    blood_pressure_records = BloodPressureRecord.query.all()
+    glucose_records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(GlucoseRecord.date).all()
+    blood_pressure_records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(BloodPressureRecord.date).all()
 
-    glucose_dates = [record.date for record in glucose_records]
+    # Format dates to ISO format for better compatibility with JavaScript
+    glucose_dates = [record.date for record in glucose_records]  # Assuming record.date is a string in 'YYYY-MM-DD'T'HH:MM:SS' format
     glucose_levels = [record.glucose_level for record in glucose_records]
 
-    blood_pressure_dates = [record.date for record in blood_pressure_records]
+    blood_pressure_dates = [record.date for record in blood_pressure_records]  # Same assumption as above
     systolic_levels = [record.systolic for record in blood_pressure_records]
     diastolic_levels = [record.diastolic for record in blood_pressure_records]
 
-    return render_template('/pages/visual_insights.html',
+    return render_template('pages/visual_insights.html',
                            glucose_dates=glucose_dates,
                            glucose_levels=glucose_levels,
                            blood_pressure_dates=blood_pressure_dates,
                            systolic_levels=systolic_levels,
                            diastolic_levels=diastolic_levels)
-    # return render_template('pages/visual_insights.html')
-
-class GlucoseRecord(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    glucose_level = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.String(10), nullable=False)
-    time = db.Column(db.String(5), nullable=False)
 
 @app.route('/glucose', methods=['GET', 'POST'])
+@login_required
 def record_glucose():
     if request.method == 'POST':
         glucose_level = request.form['glucose_level']
         date = request.form['date']
         time = request.form['time']
-        new_record = GlucoseRecord(glucose_level=glucose_level, date=date, time=time)
+        new_record = GlucoseRecord(
+            glucose_level=glucose_level,
+            date=date,
+            time=time,
+            user_id=current_user.id
+        )
         db.session.add(new_record)
         db.session.commit()
-        return redirect(url_for('glucose'))
-    return render_template('glucose_logger.html')
-
-class BloodPressureRecord(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    systolic = db.Column(db.Integer, nullable=False)
-    diastolic = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.String(10), nullable=False)
-    time = db.Column(db.String(5), nullable=False)
+        flash('Glucose data logged successfully!', 'success')
+        return redirect(url_for('glucose_logger'))
+    return render_template('pages/glucose_logger.html')
 
 @app.route('/blood_pressure', methods=['GET', 'POST'])
+@login_required
 def record_blood_pressure():
     if request.method == 'POST':
         systolic = request.form['systolic']
         diastolic = request.form['diastolic']
         date = request.form['date']
         time = request.form['time']
-        new_record = BloodPressureRecord(systolic=systolic, diastolic=diastolic, date=date, time=time)
+        new_record = BloodPressureRecord(
+            systolic=systolic,
+            diastolic=diastolic,
+            date=date,
+            time=time,
+            user_id=current_user.id
+        )
         db.session.add(new_record)
         db.session.commit()
+        flash('Blood pressure data logged successfully!', 'success')
         return redirect(url_for('blood_pressure_logger'))
     return render_template('pages/blood_pressure_logger.html')
 
@@ -322,6 +327,43 @@ def init_db():
     with app.app_context():
         db.create_all()
 
+
+# Jinting: Check db:
+@app.route('/blood_pressure_records')
+@login_required
+def blood_pressure_records():
+    records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(BloodPressureRecord.date.desc(), BloodPressureRecord.time.desc()).all()
+    return render_template('pages/blood_pressure_records.html', records=records)
+
+@app.route('/glucose_records')
+@login_required
+def glucose_records():
+    records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(GlucoseRecord.date.desc(), GlucoseRecord.time.desc()).all()
+    return render_template('pages/glucose_records.html', records=records)
+
+@app.route('/glucose_records/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_glucose_record(id):
+    record = GlucoseRecord.query.get_or_404(id)
+    if record.user_id != current_user.id:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('glucose_records'))
+    db.session.delete(record)
+    db.session.commit()
+    flash('Glucose record deleted.', 'success')
+    return redirect(url_for('glucose_records'))
+
+@app.route('/blood_pressure_records/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_blood_pressure_record(id):
+    record = BloodPressureRecord.query.get_or_404(id)
+    if record.user_id != current_user.id:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('blood_pressure_records'))
+    db.session.delete(record)
+    db.session.commit()
+    flash('Blood pressure record deleted.', 'success')
+    return redirect(url_for('blood_pressure_records'))
 #----------------------------------------------------------------------------#
 # Launch.
 #----------------------------------------------------------------------------#

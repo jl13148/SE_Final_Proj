@@ -40,6 +40,8 @@ class User(UserMixin, db.Model):
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(128))
     medications = db.relationship('Medication', backref='user', lazy='dynamic')
+    glucose_records = db.relationship('GlucoseRecord', backref='user', lazy='dynamic')
+    blood_pressure_records = db.relationship('BloodPressureRecord', backref='user', lazy='dynamic')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -60,5 +62,30 @@ class Medication(db.Model):
 
     def __repr__(self):
         return f'<Medication {self.name}>'
+    
+class GlucoseRecord(db.Model):
+    __tablename__ = 'glucose_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    glucose_level = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.String(10), nullable=False)
+    time = db.Column(db.String(5), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    def __repr__(self):
+        return f'<GlucoseRecord {self.glucose_level}>'
+
+class BloodPressureRecord(db.Model):
+    __tablename__ = 'blood_pressure_records'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    systolic = db.Column(db.Integer, nullable=False)
+    diastolic = db.Column(db.Integer, nullable=False)
+    date = db.Column(db.String(10), nullable=False)
+    time = db.Column(db.String(5), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    
+    def __repr__(self):
+        return f'<BloodPressureRecord {self.systolic}/{self.diastolic}>'
 # # Create tables.
 # Base.metadata.create_all(bind=engine)
