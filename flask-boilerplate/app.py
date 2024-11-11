@@ -30,12 +30,16 @@ app = Flask(__name__,
 )
 app.config.from_object('config')
 
+# Initialize the database
 db.init_app(app)
-login_manager = LoginManager(app)
-login_manager.login_view = 'login'
 
-# Initialize Migrate
+# Initialize Flask-Migrate
 migrate = Migrate(app, db)
+
+# Initialize Flask-Login
+login_manager = LoginManager()
+login_manager.init_app(app)
+login_manager.login_view = 'login'
 # Automatically tear down SQLAlchemy.
 '''
 @app.teardown_request
