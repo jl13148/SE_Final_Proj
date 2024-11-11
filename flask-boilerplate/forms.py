@@ -1,5 +1,5 @@
 from flask_wtf import Form, FlaskForm
-from wtforms import StringField, PasswordField, BooleanField, SubmitField, TimeField, SelectField
+from wtforms import StringField, PasswordField, BooleanField, SubmitField, TimeField, SelectField, HiddenField
 from wtforms.validators import DataRequired, Email, EqualTo, Length, ValidationError
 from models import User
 
@@ -40,11 +40,11 @@ class MedicationForm(FlaskForm):
     name = StringField('Medication Name', validators=[DataRequired()])
     dosage = StringField('Dosage', validators=[DataRequired()])
     frequency = SelectField('Frequency', 
-                          choices=[('daily', 'Once Daily'),
-                                 ('twice_daily', 'Twice Daily'),
-                                 ('three_times', 'Three Times Daily'),
-                                 ('weekly', 'Weekly'),
-                                 ('as_needed', 'As Needed')],
+                          choices=[
+                              ('daily', 'Once Daily'),
+                              ('twice_daily', 'Twice Daily'),
+                              ('three_times_daily', 'Three Times Daily')
+                          ],
                           validators=[DataRequired()])
-    time = TimeField('Time', format='%H:%M', validators=[DataRequired()])
-    submit = SubmitField('Add Medication')
+    time = TimeField('Time', validators=[DataRequired()])
+    submit = SubmitField('Save Medication')

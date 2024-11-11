@@ -32,5 +32,74 @@ a {
 /*****************************************************************************
  * Various other styles
  ****************************************************************************/
+ 
+/* Medication Schedule Styles */
+.medication-item {
+  display: flex;
+  align-items: center;
+  padding: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  transition: all 0.3s ease;
+  background-color: white;
+}
+
+.medication-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+
+.medication-item.taken {
+  background-color: #f8f9fa;
+  opacity: 0.8;
+}
+
+.time-badge {
+  background-color: #007bff;
+  color: white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-weight: bold;
+  min-width: 100px;
+  text-align: center;
+  margin-right: 1rem;
+}
+
+.medication-item.taken .time-badge {
+  background-color: #28a745;
+}
+
+.medication-details {
+  flex-grow: 1;
+}
+
+.medication-details h4 {
+  margin: 0;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.medication-details p {
+  margin: 0.25rem 0 0;
+  color: #666;
+}
+
+#loading-spinner {
+  padding: 2rem;
+  text-align: center;
+}
+
+/* Reminder Alert Styles */
+#reminderAlert {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+  100% { transform: scale(1); }
+}
+
 
 /* Various other styles end */
