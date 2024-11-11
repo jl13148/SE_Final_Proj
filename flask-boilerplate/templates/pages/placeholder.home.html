@@ -10,11 +10,6 @@
                 <img src="{{ url_for('static', filename='img/logo.png') }}" alt="DiabetesEase" class="mb-4" style="height: 50px;">
                 <h1 class="display-4 text-white fw-bold mb-3 animate-text">Take Control of Your Diabetes</h1>
                 <p class="lead text-white mb-4">Simple, smart, and secure diabetes management at your fingertips.</p>
-                <!-- {% if current_user.is_authenticated %}
-                    <a href="{{ url_for('medications') }}" class="btn btn-light btn-lg pulse-button">Manage Medications</a>
-                {% else %}
-                    <a href="{{ url_for('register') }}" class="btn btn-light btn-lg me-3 pulse-button">Get Started Free</a>
-                {% endif %} -->
             </div>
             <div class="col-lg-6 text-center">
                 <div class="floating-animation">
@@ -36,18 +31,23 @@
         <div class="row g-4">
             <!-- Medication Scheduler -->
             <div class="col-md-4">
-                <div class="feature-card">
-                    <div class="icon-wrapper">
-                        <i class="fas fa-pills"></i>
+                <a href="{{ url_for('medications') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-pills"></i>
+                        </div>
+                        <h3>Medication Scheduler</h3>
+                        <p>Never miss a dose with smart reminders and easy medication tracking.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> Custom schedules</li>
+                            <li><span class="check-icon">✓</span> Timely reminders</li>
+                            <li><span class="check-icon">✓</span> Medication history</li>
+                        </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
                     </div>
-                    <h3>Medication Scheduler</h3>
-                    <p>Never miss a dose with smart reminders and easy medication tracking.</p>
-                    <ul class="feature-list">
-                        <li><span class="check-icon">✓</span> Custom schedules</li>
-                        <li><span class="check-icon">✓</span> Timely reminders</li>
-                        <li><span class="check-icon">✓</span> Medication history</li>
-                    </ul>
-                </div>
+                </a>
             </div>
 
             <!-- Health Logger -->
@@ -110,12 +110,52 @@
     --light-bg: #f8f9fa;
 }
 
+/* Your existing styles remain the same */
+
+/* New styles for clickable cards */
+.feature-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    height: 100%;
+    position: relative;
+}
+
+.feature-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.feature-card {
+    position: relative;
+    overflow: hidden;
+}
+
+.card-arrow {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.3s ease;
+    color: var(--primary-dark);
+}
+
+.feature-card-link:hover .card-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.feature-card-link:hover .feature-card {
+    border-color: var(--primary-dark);
+}
+
+/* Rest of your existing styles remain the same */
 .hero-section {
     background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
     padding-bottom: 100px;
 }
 
-/* Animated wave */
 .wave-bottom {
     position: absolute;
     bottom: 0;
@@ -125,7 +165,6 @@
     line-height: 0;
 }
 
-/* Floating animation for hero image */
 .floating-animation {
     animation: float 6s ease-in-out infinite;
 }
@@ -136,13 +175,12 @@
     100% { transform: translateY(0px); }
 }
 
-/* Feature cards */
 .feature-card {
     background: white;
     border-radius: 15px;
     padding: 2rem;
     box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    transition: transform 0.3s ease, box-shadow 0.3s ease;
+    transition: all 0.3s ease;
     height: 100%;
 }
 
@@ -178,7 +216,6 @@
     color: white;
 }
 
-/* Feature list styling */
 .feature-list {
     list-style: none;
     padding: 0;
@@ -197,7 +234,6 @@
     font-weight: bold;
 }
 
-/* Pulse animation for buttons */
 .pulse-button {
     position: relative;
     transition: all 0.3s ease;
@@ -208,7 +244,6 @@
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
 }
 
-/* Text animation */
 .animate-text {
     opacity: 0;
     animation: fadeInUp 1s ease forwards;

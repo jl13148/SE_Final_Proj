@@ -9,12 +9,13 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from forms import *
-from datetime import datetime
+from datetime import time, datetime
+from flask import jsonify
 import os
 from flask_login import login_required, current_user, LoginManager, login_user, logout_user
 
 # Import models and forms after initializing db
-from models import db, User, Medication, GlucoseRecord, BloodPressureRecord
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog
 from forms import LoginForm, RegisterForm, ForgotForm, MedicationForm
 
 #----------------------------------------------------------------------------#
@@ -72,72 +73,73 @@ def about():
     return render_template('pages/placeholder.about.html')
 
 @app.route('/medications')
+@login_required
 def medications():
-    """Public view of medications, with different displays for logged-in vs anonymous users"""
-    if current_user.is_authenticated:
-        # Show personal medications for logged-in users
-        medications = Medication.query.filter_by(user_id=current_user.id).order_by(Medication.time).all()
+    return redirect(url_for('medication_schedule'))
+
+@app.route('/medications/manage')
+@login_required
+def manage_medications():
+    try:
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
         return render_template('pages/medications.html', 
-                             medications=medications, 
+                             medications=medications,
                              is_personal=True)
-    else:
-        # Show sample medications or public info for anonymous users
-        sample_medications = [
-            {
-                'name': 'Metformin',
-                'dosage': '500mg',
-                'frequency': 'twice_daily',
-                'time': datetime.strptime('09:00', '%H:%M').time(),
-                'description': 'Common diabetes medication that helps control blood sugar levels.'
-            },
-            {
-                'name': 'Insulin',
-                'dosage': '10 units',
-                'frequency': 'daily',
-                'time': datetime.strptime('08:00', '%H:%M').time(),
-                'description': 'Hormone medication that helps your body process glucose.'
-            },
-            {
-                'name': 'Glipizide',
-                'dosage': '5mg',
-                'frequency': 'daily',
-                'time': datetime.strptime('12:00', '%H:%M').time(),
-                'description': 'Medication that helps your pancreas produce more insulin.'
-            }
-        ]
-        return render_template('pages/medications.html', 
-                             medications=sample_medications, 
-                             is_personal=False)
+    except Exception as e:
+        flash('Error loading medications. Please try again.', 'danger')
+        return redirect(url_for('home'))
+
 
 @app.route('/medications/add', methods=['GET', 'POST'])
-@login_required  # Keep this protected
+@login_required
 def add_medication():
     form = MedicationForm()
     if form.validate_on_submit():
-        medication = Medication(
-            name=form.name.data,
-            dosage=form.dosage.data,
-            frequency=form.frequency.data,
-            time=form.time.data,
-            user_id=current_user.id
-        )
-        db.session.add(medication)
-        db.session.commit()
-        flash('Medication added successfully!')
-        return redirect(url_for('medications'))
-    return render_template('forms/medication.html', form=form)
+        try:
+            # Create new medication with the form data
+            medication = Medication(
+                name=form.name.data,
+                dosage=form.dosage.data,
+                frequency=form.frequency.data,
+                time=form.time.data,
+                user_id=current_user.id
+            )
+            
+            db.session.add(medication)
+            db.session.commit()
+            
+            flash('Medication added successfully!', 'success')
+            return redirect(url_for('manage_medications'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding medication: {str(e)}', 'danger')
+            return redirect(url_for('add_medication'))
+    
+    return render_template('pages/add_medication.html', form=form)
 
 @app.route('/medications/<int:id>/delete', methods=['POST'])
-@login_required  # Keep this protected
+@login_required
 def delete_medication(id):
-    medication = Medication.query.get_or_404(id)
-    if medication.user_id != current_user.id:
-        flash('Unauthorized access.')
-        return redirect(url_for('medications'))
-    db.session.delete(medication)
-    db.session.commit()
-    flash('Medication deleted.')
-    return redirect(url_for('medications'))
+    try:
+        medication = Medication.query.get_or_404(id)
+        # Check if the medication belongs to the current user
+        if medication.user_id != current_user.id:
+            flash('Unauthorized action.', 'danger')
+            return redirect(url_for('medications'))
+            
+        # Delete associated logs first
+        MedicationLog.query.filter_by(medication_id=id).delete()
+        
+        # Delete the medication
+        db.session.delete(medication)
+        db.session.commit()
+        
+        flash('Medication deleted successfully.', 'success')
+        return redirect(url_for('manage_medications'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the medication.', 'danger')
+        return redirect(url_for('manage_medications'))
 
 
 # Jinting: Health Logger Function Implementation
@@ -246,6 +248,109 @@ def record_blood_pressure():
 #     form = RegisterForm(request.form)
 #     return render_template('forms/register.html', form=form)
 
+@app.route('/medications/log/<int:medication_id>', methods=['POST'])
+@login_required
+def log_medication(medication_id):
+    try:
+        medication = Medication.query.get_or_404(medication_id)
+        if medication.user_id != current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        # Check if already logged today
+        today = datetime.now().date()
+        existing_log = MedicationLog.query.filter(
+            MedicationLog.medication_id == medication_id,
+            MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
+        ).first()
+        
+        if existing_log:
+            return jsonify({'message': 'Medication already logged today'}), 400
+            
+        # Create new log
+        log = MedicationLog(
+            medication_id=medication_id,
+            user_id=current_user.id,
+            taken_at=datetime.now()
+        )
+        db.session.add(log)
+        db.session.commit()
+        return jsonify({'message': 'Medication logged successfully'})
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/medication-schedule')
+@login_required
+def medication_schedule():
+    try:
+        return render_template('pages/medication-schedule.html')
+    except Exception as e:
+        flash('Error loading schedule. Please try again.', 'danger')
+        return redirect(url_for('home'))
+
+@app.route('/medications/daily')
+@login_required
+def get_daily_medications():
+    try:
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
+        medication_list = []
+        
+        for med in medications:
+            medication_list.append({
+                'id': med.id,
+                'name': med.name,
+                'dosage': med.dosage,
+                'time': med.time.strftime('%I:%M %p'),
+                'frequency': med.frequency,
+                'taken': False  # You can implement the taken status logic here
+            })
+        
+        return jsonify(medication_list)
+    except Exception as e:
+        print(f"Error in get_daily_medications: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+    
+
+
+@app.route('/medications/check-reminders')
+@login_required
+def check_reminders():
+    try:
+        now = datetime.now()
+        current_time = now.time()
+        today = now.date()
+        
+        # Look for medications due in the next 15 minutes
+        upcoming_medications = []
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
+        
+        for med in medications:
+            # Calculate the next dose time
+            med_time = datetime.combine(today, med.time)
+            
+            # Check if medication is due in the next 15 minutes
+            time_diff = (med_time - now).total_seconds() / 60
+            if 0 <= time_diff <= 15:
+                # Check if it hasn't been taken yet today
+                taken = MedicationLog.query.filter(
+                    MedicationLog.medication_id == med.id,
+                    MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
+                ).first() is not None
+                
+                if not taken:
+                    upcoming_medications.append({
+                        'id': med.id,
+                        'name': med.name,
+                        'dosage': med.dosage,
+                        'time': med.time.strftime('%I:%M %p')
+                    })
+        
+        return jsonify(upcoming_medications)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if current_user.is_authenticated:
@@ -323,10 +428,34 @@ if not app.debug:
     app.logger.info('errors')
 
 
-def init_db():
-    with app.app_context():
-        db.create_all()
+# def init_db():
+#     with app.app_context():
+#         db.create_all()
 
+# #----------------------------------------------------------------------------#
+# # Launch.
+# #----------------------------------------------------------------------------#
+
+# # Default port:
+# if __name__ == '__main__':
+#     init_db()
+#     app.run()
+
+@app.cli.command("reset_db")
+def reset_db():
+    """Reset the database."""
+    with app.app_context():
+        # Drop all tables
+        db.drop_all()
+        # Create all tables
+        db.create_all()
+        print('Database has been reset!')
+
+@app.cli.command("init_db")
+def init_db():
+    """Initialize the database."""
+    db.create_all()
+    print('Database initialized!')
 
 # Jinting: Check db:
 @app.route('/blood_pressure_records')
@@ -370,7 +499,8 @@ def delete_blood_pressure_record(id):
 
 # Default port:
 if __name__ == '__main__':
-    init_db()
+    with app.app_context():
+        db.create_all()  # This will create all tables
     app.run()
 
 # Or specify port manually:
