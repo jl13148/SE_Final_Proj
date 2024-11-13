@@ -187,70 +187,87 @@ def visual_insight_page():
 @login_required
 def record_glucose():
     if request.method == 'POST':
-        glucose_level = request.form['glucose_level']
-        date = request.form['date']
-        time = request.form['time']
+        # Attempt to convert glucose_level to integer
+        try:
+            glucose_level = int(request.form['glucose_level'])
+        except ValueError:
+            flash('Glucose level must be an integer.', 'danger')
+            return render_template('pages/glucose_logger.html')
+
+        # Validate glucose level boundaries
+        MIN_GLUCOSE = 70    # Minimum acceptable glucose level in mg/dL
+        MAX_GLUCOSE = 180   # Maximum acceptable glucose level in mg/dL
+
+        if not (MIN_GLUCOSE <= glucose_level <= MAX_GLUCOSE):
+            flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
+            return render_template('pages/glucose_logger.html')
+
+        # Validate date and time formats
+        date_str = request.form['date']
+        time_str = request.form['time']
+
+        # Create a new GlucoseRecord
         new_record = GlucoseRecord(
             glucose_level=glucose_level,
-            date=date,
-            time=time,
+            date=date_str,
+            time=time_str,
             user_id=current_user.id
         )
+
+        # Add and commit the new record
         db.session.add(new_record)
         db.session.commit()
+
         flash('Glucose data logged successfully!', 'success')
         return redirect(url_for('glucose_logger'))
+
     return render_template('pages/glucose_logger.html')
 
 @app.route('/blood_pressure', methods=['GET', 'POST'])
 @login_required
 def record_blood_pressure():
     if request.method == 'POST':
-        systolic = request.form['systolic']
-        diastolic = request.form['diastolic']
-        date = request.form['date']
-        time = request.form['time']
+        try:
+            systolic = int(request.form['systolic'])
+            diastolic = int(request.form['diastolic'])
+        except ValueError:
+            flash('Systolic and Diastolic values must be integers.', 'danger')
+            return render_template('pages/blood_pressure_logger.html')
+
+        # Valid ranges
+        MIN_SYSTOLIC = 90
+        MAX_SYSTOLIC = 180
+        MIN_DIASTOLIC = 60
+        MAX_DIASTOLIC = 120
+
+        if not (MIN_SYSTOLIC <= systolic <= MAX_SYSTOLIC):
+            flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
+            return render_template('pages/blood_pressure_logger.html')
+
+        if not (MIN_DIASTOLIC <= diastolic <= MAX_DIASTOLIC):
+            flash(f'Diastolic value must be between {MIN_DIASTOLIC} and {MAX_DIASTOLIC} mm Hg.', 'danger')
+            return render_template('pages/blood_pressure_logger.html')
+
+        date_str = request.form['date']
+        time_str = request.form['time']
+
+        # Create a new BloodPressureRecord
         new_record = BloodPressureRecord(
             systolic=systolic,
             diastolic=diastolic,
-            date=date,
-            time=time,
+            date=date_str,
+            time=time_str,
             user_id=current_user.id
         )
+
+        # Add and commit the new record
         db.session.add(new_record)
         db.session.commit()
+
         flash('Blood pressure data logged successfully!', 'success')
         return redirect(url_for('blood_pressure_logger'))
+
     return render_template('pages/blood_pressure_logger.html')
-
-# @app.route('/visual_insights')
-# def visual_insights():
-#     glucose_records = GlucoseRecord.query.all()
-#     blood_pressure_records = BloodPressureRecord.query.all()
-
-#     glucose_dates = [record.date for record in glucose_records]
-#     glucose_levels = [record.glucose_level for record in glucose_records]
-
-#     blood_pressure_dates = [record.date for record in blood_pressure_records]
-#     systolic_levels = [record.systolic for record in blood_pressure_records]
-#     diastolic_levels = [record.diastolic for record in blood_pressure_records]
-
-#     return render_template('/pages/visual_insights.html',
-#                            glucose_dates=glucose_dates,
-#                            glucose_levels=glucose_levels,
-#                            blood_pressure_dates=blood_pressure_dates,
-#                            systolic_levels=systolic_levels,
-#                            diastolic_levels=diastolic_levels)
-# @app.route('/login')
-# def login():
-#     form = LoginForm(request.form)
-#     return render_template('forms/login.html', form=form)
-
-
-# @app.route('/register')
-# def register():
-#     form = RegisterForm(request.form)
-#     return render_template('forms/register.html', form=form)
 
 @app.route('/medications/log/<int:medication_id>', methods=['POST'])
 @login_required
