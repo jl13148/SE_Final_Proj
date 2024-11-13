@@ -187,7 +187,6 @@ def visual_insight_page():
 @login_required
 def record_glucose():
     if request.method == 'POST':
-        # Attempt to convert glucose_level to integer
         try:
             glucose_level = int(request.form['glucose_level'])
         except ValueError:
@@ -202,11 +201,9 @@ def record_glucose():
             flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
             return render_template('pages/glucose_logger.html')
 
-        # Validate date and time formats
         date_str = request.form['date']
         time_str = request.form['time']
 
-        # Create a new GlucoseRecord
         new_record = GlucoseRecord(
             glucose_level=glucose_level,
             date=date_str,
@@ -214,7 +211,6 @@ def record_glucose():
             user_id=current_user.id
         )
 
-        # Add and commit the new record
         db.session.add(new_record)
         db.session.commit()
 
