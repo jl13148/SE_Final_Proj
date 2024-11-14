@@ -3,6 +3,7 @@ from unittest.mock import patch, MagicMock
 from datetime import datetime, time, timedelta
 from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
+from werkzeug.exceptions import NotFound
 from app import app
 from models import User, Medication, MedicationLog, GlucoseRecord, BloodPressureRecord
 import json
@@ -12,6 +13,9 @@ class HealthAppTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         app.config['WTF_CSRF_ENABLED'] = False
+        app.config['SERVER_NAME'] = 'localhost'
+        app.config['PREFERRED_URL_SCHEME'] = 'http'
+
         self.app_context = app.app_context()
         self.app_context.push()
         self.client = app.test_client()
@@ -20,9 +24,11 @@ class HealthAppTestCase(unittest.TestCase):
         self.patcher_add = patch('app.db.session.add')
         self.patcher_commit = patch('app.db.session.commit')
         self.patcher_rollback = patch('app.db.session.rollback')
+        self.patcher_delete = patch('app.db.session.delete')
         self.mock_add = self.patcher_add.start()
         self.mock_commit = self.patcher_commit.start()
         self.mock_rollback = self.patcher_rollback.start()
+        self.mock_delete = self.patcher_delete.start()
 
         # Mock current user
         self.mock_user = MagicMock(spec=User)
@@ -86,56 +92,122 @@ class HealthAppTestCase(unittest.TestCase):
         response = self.client.get('/medications/add')
         self.assertEqual(response.status_code, 200)
 
-    def test_add_medication_post_success(self):
-        """Test successful medication addition"""
+    def test_add_medication_success(self):
+            """Test successful medication addition"""
+            with patch('app.MedicationForm') as MockForm, \
+                patch('app.flash') as mock_flash:
+                # Mock form with valid data
+                mock_form = MagicMock()
+                mock_form.validate_on_submit.return_value = True
+                mock_form.name.data = "TestMed"
+                mock_form.dosage.data = "10mg"
+                mock_form.frequency.data = "daily"
+                mock_form.time.data = time(8, 0)
+                MockForm.return_value = mock_form
+
+                with app.test_request_context():
+                    response = self.client.post('/medications/add')
+                    
+                    # Verify success
+                    self.assertEqual(response.status_code, 302)
+                    self.mock_add.assert_called_once()
+                    mock_flash.assert_called_with(
+                        'Medication added successfully!', 
+                        'success'
+                    )
+
+    def test_add_medication_database_error(self):
+        """Test database error handling in medication addition"""
         with patch('app.MedicationForm') as MockForm, \
-             patch('app.flash') as mock_flash:
+            patch('app.flash') as mock_flash:
+            # Mock the form to return valid data
             mock_form = MagicMock()
             mock_form.validate_on_submit.return_value = True
-            mock_form.name.data = "TestMed"
-            mock_form.dosage.data = "10mg"
-            mock_form.frequency.data = "daily"
-            mock_form.time.data = time(8, 0)
+            mock_form.name.data = "Test Medicine"
+            mock_form.dosage.data = "100mg"
+            mock_form.frequency.data = "Daily"
+            mock_form.time.data = time(9, 0)
             MockForm.return_value = mock_form
 
-            response = self.client.post('/medications/add')
-            self.assertEqual(response.status_code, 302)
-            self.mock_add.assert_called_once()
-            mock_flash.assert_called_with('Medication added successfully!', 'success')
-
-    def test_add_medication_form_validation_error(self):
-        """Test form validation error in medication addition"""
-        with patch('app.MedicationForm') as MockForm:
-            mock_form = MagicMock()
-            mock_form.validate_on_submit.return_value = False
-            MockForm.return_value = mock_form
-            response = self.client.post('/medications/add')
-            self.assertEqual(response.status_code, 200)
-            self.mock_add.assert_not_called()
+            # Force db.session.commit to raise an exception
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            with app.test_request_context():
+                response = self.client.post('/medications/add')
+                
+                # Verify error handling
+                self.assertEqual(response.status_code, 302)
+                self.mock_rollback.assert_called_once()
+                mock_flash.assert_called_with(
+                    'Error adding medication: Database error', 
+                    'danger'
+                )
+                # Reset the side effect for other tests
+                self.mock_commit.side_effect = None
 
     def test_delete_medication_success(self):
         """Test successful medication deletion"""
         with patch('app.Medication.query') as mock_query, \
              patch('app.MedicationLog.query') as mock_log_query, \
              patch('app.flash') as mock_flash:
+            # Setup mock medication
             mock_med = MagicMock()
             mock_med.user_id = self.mock_user.id
             mock_query.get_or_404.return_value = mock_med
+            
+            # Setup mock log query
             mock_log_query.filter_by.return_value.delete.return_value = None
-
+            
             response = self.client.post('/medications/1/delete')
+            
+            # Verify deletion was successful
             self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_called_once_with(mock_med)
             self.mock_commit.assert_called_once()
             mock_flash.assert_called_with('Medication deleted successfully.', 'success')
 
     def test_delete_medication_unauthorized(self):
         """Test unauthorized medication deletion"""
-        with patch('app.Medication.query') as mock_query:
+        with patch('app.Medication.query') as mock_query, \
+             patch('app.flash') as mock_flash:
+            # Setup mock medication with different user_id
             mock_med = MagicMock()
             mock_med.user_id = 999  # Different user
             mock_query.get_or_404.return_value = mock_med
+            
             response = self.client.post('/medications/1/delete')
+            
+            # Verify unauthorized access was handled
             self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+            mock_flash.assert_called_with('Unauthorized action.', 'danger')
+
+    def test_delete_medication_database_error(self):
+        """Test database error handling in medication deletion"""
+        with patch('app.Medication.query') as mock_query, \
+             patch('app.MedicationLog.query') as mock_log_query, \
+             patch('app.flash') as mock_flash:
+            # Setup mock medication
+            mock_med = MagicMock()
+            mock_med.user_id = self.mock_user.id
+            mock_query.get_or_404.return_value = mock_med
+            
+            # Setup mock log query
+            mock_log_query.filter_by.return_value.delete.return_value = None
+            
+            # Force database error
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            response = self.client.post('/medications/1/delete')
+            
+            # Verify error handling
+            self.assertEqual(response.status_code, 302)
+            self.mock_rollback.assert_called_once()
+            mock_flash.assert_called_with('An error occurred while deleting the medication.', 'danger')
+            
+            # Reset the side effect for other tests
+            self.mock_commit.side_effect = None
 
     def test_log_medication_success(self):
         """Test successful medication logging"""
@@ -143,13 +215,32 @@ class HealthAppTestCase(unittest.TestCase):
             mock_med = MagicMock()
             mock_med.user_id = self.mock_user.id
             mock_query.get_or_404.return_value = mock_med
-
+            
             with patch('app.MedicationLog.query') as mock_log_query:
                 mock_log_query.filter.return_value.first.return_value = None
+                
                 response = self.client.post('/medications/log/1')
+                
                 self.assertEqual(response.status_code, 200)
                 data = json.loads(response.data)
                 self.assertEqual(data['message'], 'Medication logged successfully')
+                self.mock_add.assert_called_once()
+                self.mock_commit.assert_called_once()
+
+    def test_log_medication_unauthorized(self):
+        """Test unauthorized medication logging attempt"""
+        with patch('app.Medication.query') as mock_query:
+            mock_med = MagicMock()
+            mock_med.user_id = 10  
+            mock_query.get_or_404.return_value = mock_med
+            
+            response = self.client.post('/medications/log/1')
+            
+            self.assertEqual(response.status_code, 403)
+            data = json.loads(response.data)
+            self.assertEqual(data['error'], 'Unauthorized')
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
 
     def test_log_medication_already_taken(self):
         """Test logging already taken medication"""
@@ -157,18 +248,59 @@ class HealthAppTestCase(unittest.TestCase):
             mock_med = MagicMock()
             mock_med.user_id = self.mock_user.id
             mock_query.get_or_404.return_value = mock_med
-
+            
             with patch('app.MedicationLog.query') as mock_log_query:
                 mock_log_query.filter.return_value.first.return_value = MagicMock()
+                
                 response = self.client.post('/medications/log/1')
+                
                 self.assertEqual(response.status_code, 400)
                 data = json.loads(response.data)
                 self.assertEqual(data['message'], 'Medication already logged today')
+                self.mock_add.assert_not_called()
+                self.mock_commit.assert_not_called()
+
+    def test_log_medication_database_error(self):
+        """Test database error handling in medication logging"""
+        with patch('app.Medication.query') as mock_query:
+            mock_med = MagicMock()
+            mock_med.user_id = self.mock_user.id
+            mock_query.get_or_404.return_value = mock_med
+            
+            with patch('app.MedicationLog.query') as mock_log_query:
+                mock_log_query.filter.return_value.first.return_value = None
+                
+                # Force database error
+                self.mock_commit.side_effect = Exception("Database error")
+                
+                try:
+                    response = self.client.post('/medications/log/1')
+                    
+                    self.assertEqual(response.status_code, 500)
+                    data = json.loads(response.data)
+                    self.assertEqual(data['error'], 'Database error')
+                    self.mock_rollback.assert_called_once()
+                finally:
+                    # Reset the side effect
+                    self.mock_commit.side_effect = None
 
     def test_medication_schedule_success(self):
         """Test medication schedule page"""
         response = self.client.get('/medication-schedule')
         self.assertEqual(response.status_code, 200)
+
+    def test_medication_schedule_exception(self):
+        """Test medication schedule page with exception"""
+        with patch('app.render_template') as mock_render, \
+            patch('app.flash') as mock_flash:
+            # Force render_template to raise an exception
+            mock_render.side_effect = Exception("Template error")
+            
+            response = self.client.get('/medication-schedule')
+            
+            # Verify redirect to home page
+            self.assertEqual(response.status_code, 302)
+            mock_flash.assert_called_with('Error loading schedule. Please try again.', 'danger')
 
     def test_get_daily_medications_success(self):
         """Test daily medications retrieval"""
@@ -178,14 +310,28 @@ class HealthAppTestCase(unittest.TestCase):
         mock_med.dosage = "10mg"
         mock_med.time = time(8, 0)
         mock_med.frequency = "daily"
-
+        
         with patch('app.Medication.query') as mock_query:
             mock_query.filter_by.return_value.all.return_value = [mock_med]
+            
             response = self.client.get('/medications/daily')
+            
             self.assertEqual(response.status_code, 200)
             data = json.loads(response.data)
             self.assertEqual(len(data), 1)
             self.assertEqual(data[0]['name'], "TestMed")
+
+    def test_get_daily_medications_exception(self):
+        """Test daily medications retrieval with database error"""
+        with patch('app.Medication.query') as mock_query:
+            # Force database error
+            mock_query.filter_by.side_effect = Exception("Database error")
+            
+            response = self.client.get('/medications/daily')
+            
+            self.assertEqual(response.status_code, 500)
+            data = json.loads(response.data)
+            self.assertEqual(data['error'], 'Database error')
 
     def test_check_reminders_success(self):
         """Test medication reminders"""
@@ -197,13 +343,53 @@ class HealthAppTestCase(unittest.TestCase):
         mock_med.name = "TestMed"
         mock_med.dosage = "10mg"
         mock_med.time = test_time
-
+        
         with patch('app.Medication.query') as mock_query, \
-             patch('app.MedicationLog.query') as mock_log_query:
+            patch('app.MedicationLog.query') as mock_log_query:
             mock_query.filter_by.return_value.all.return_value = [mock_med]
             mock_log_query.filter.return_value.first.return_value = None
+            
             response = self.client.get('/medications/check-reminders')
+            
             self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data)
+            self.assertEqual(len(data), 1)
+            self.assertEqual(data[0]['name'], 'TestMed')
+
+    def test_check_reminders_exception(self):
+        """Test medication reminders with database error"""
+        with patch('app.Medication.query') as mock_query:
+            # Force database error
+            mock_query.filter_by.side_effect = Exception("Database error")
+            
+            response = self.client.get('/medications/check-reminders')
+            
+            self.assertEqual(response.status_code, 500)
+            data = json.loads(response.data)
+            self.assertEqual(data['error'], 'Database error')
+
+    def test_check_reminders_empty(self):
+        """Test medication reminders with no upcoming medications"""
+        current_time = datetime.now()
+        test_time = (current_time + timedelta(hours=2)).time()  # Time far in future
+        
+        mock_med = MagicMock()
+        mock_med.id = 1
+        mock_med.name = "TestMed"
+        mock_med.dosage = "10mg"
+        mock_med.time = test_time
+        
+        with patch('app.Medication.query') as mock_query, \
+            patch('app.MedicationLog.query') as mock_log_query:
+            mock_query.filter_by.return_value.all.return_value = [mock_med]
+            mock_log_query.filter.return_value.first.return_value = None
+            
+            response = self.client.get('/medications/check-reminders')
+            
+            self.assertEqual(response.status_code, 200)
+            data = json.loads(response.data)
+            self.assertEqual(len(data), 0)  # No medications should be returned
+
 
     # Tests for /glucose route
     @patch('app.GlucoseRecord')
@@ -438,4 +624,14 @@ class HealthAppTestCase(unittest.TestCase):
         self.mock_commit.assert_not_called()
 
 if __name__ == '__main__':
-    unittest.main(testRunner=HtmlTestRunner.HTMLTestRunner(output='test-reports'))
+    # Use a simpler test runner if HtmlTestRunner is causing issues
+    try:
+        unittest.main(testRunner=HtmlTestRunner.HTMLTestRunner(
+            output='test_reports',
+            combine_reports=True,
+            report_title="Test Results",
+            add_timestamp=True
+        ))
+    except AttributeError:
+        # Fallback to standard test runner
+        unittest.main(verbosity=2)
