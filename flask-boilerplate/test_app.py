@@ -623,6 +623,131 @@ class HealthAppTestCase(unittest.TestCase):
         self.mock_add.assert_not_called()
         self.mock_commit.assert_not_called()
 
+    # Check db for Logger
+    def test_blood_pressure_records_success(self):
+        """Test successful blood pressure records retrieval"""
+        # Create mock records
+        mock_record1 = MagicMock(spec=BloodPressureRecord)
+        mock_record1.date = datetime.now().date()
+        mock_record1.time = datetime.now().time()
+        mock_record1.systolic = 120
+        mock_record1.diastolic = 80
+
+        with patch('app.BloodPressureRecord.query') as mock_query, \
+            patch('app.render_template') as mock_render:
+            # Setup query mock
+            mock_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_record1]
+            mock_render.return_value = 'rendered template'
+            
+            response = self.client.get('/blood_pressure_records')
+            
+            self.assertEqual(response.status_code, 200)
+            mock_render.assert_called_with('pages/blood_pressure_records.html', records=[mock_record1])
+
+    def test_glucose_records_success(self):
+        """Test successful glucose records retrieval"""
+        # Create mock records
+        mock_record1 = MagicMock(spec=GlucoseRecord)
+        mock_record1.date = datetime.now().date()
+        mock_record1.time = datetime.now().time()
+        mock_record1.level = 100
+
+        with patch('app.GlucoseRecord.query') as mock_query, \
+            patch('app.render_template') as mock_render:
+            # Setup query mock
+            mock_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_record1]
+            mock_render.return_value = 'rendered template'
+            
+            response = self.client.get('/glucose_records')
+            
+            self.assertEqual(response.status_code, 200)
+            mock_render.assert_called_with('pages/glucose_records.html', records=[mock_record1])
+
+    def test_delete_glucose_record_success(self):
+        """Test successful glucose record deletion"""
+        with patch('app.GlucoseRecord.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            # Setup mock record
+            mock_record = MagicMock(spec=GlucoseRecord)
+            mock_record.user_id = self.mock_user.id
+            mock_query.get_or_404.return_value = mock_record
+            
+            response = self.client.post('/glucose_records/delete/1')
+            
+            self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_called_once_with(mock_record)
+            self.mock_commit.assert_called_once()
+            mock_flash.assert_called_with('Glucose record deleted.', 'success')
+
+    def test_delete_glucose_record_unauthorized(self):
+        """Test unauthorized glucose record deletion"""
+        with patch('app.GlucoseRecord.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            # Setup mock record with different user_id
+            mock_record = MagicMock(spec=GlucoseRecord)
+            mock_record.user_id = 99  # Different from self.mock_user.id
+            mock_query.get_or_404.return_value = mock_record
+            
+            response = self.client.post('/glucose_records/delete/1')
+            
+            self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+            mock_flash.assert_called_with('Unauthorized access.', 'danger')
+
+    def test_delete_glucose_record_not_found(self):
+        """Test deletion of non-existent glucose record"""
+        with patch('app.GlucoseRecord.query') as mock_query:
+            mock_query.get_or_404.side_effect = NotFound()
+            
+            response = self.client.post('/glucose_records/delete/99')
+            
+            self.assertEqual(response.status_code, 404)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_delete_blood_pressure_record_success(self):
+        """Test successful blood pressure record deletion"""
+        with patch('app.BloodPressureRecord.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            # Setup mock record
+            mock_record = MagicMock(spec=BloodPressureRecord)
+            mock_record.user_id = self.mock_user.id
+            mock_query.get_or_404.return_value = mock_record
+            
+            response = self.client.post('/blood_pressure_records/delete/1')
+            
+            self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_called_once_with(mock_record)
+            self.mock_commit.assert_called_once()
+            mock_flash.assert_called_with('Blood pressure record deleted.', 'success')
+
+    def test_delete_blood_pressure_record_unauthorized(self):
+        """Test unauthorized blood pressure record deletion"""
+        with patch('app.BloodPressureRecord.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            # Setup mock record with different user_id
+            mock_record = MagicMock(spec=BloodPressureRecord)
+            mock_record.user_id = 99  # Different from self.mock_user.id
+            mock_query.get_or_404.return_value = mock_record
+            
+            response = self.client.post('/blood_pressure_records/delete/1')
+            
+            self.assertEqual(response.status_code, 302)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+            mock_flash.assert_called_with('Unauthorized access.', 'danger')
+
+    def test_delete_blood_pressure_record_not_found(self):
+        """Test deletion of non-existent blood pressure record"""
+        with patch('app.BloodPressureRecord.query') as mock_query:
+            mock_query.get_or_404.side_effect = NotFound()
+            
+            response = self.client.post('/blood_pressure_records/delete/99')
+            
+            self.assertEqual(response.status_code, 404)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
 if __name__ == '__main__':
     # Use a simpler test runner if HtmlTestRunner is causing issues
     try:
