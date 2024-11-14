@@ -162,26 +162,26 @@ def glucose_logger():
 def blood_pressure_logger():
     return render_template('pages/blood_pressure_logger.html')
 
-@app.route('/health-logger/visual_insight_page')
-@login_required
-def visual_insight_page():
-    glucose_records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(GlucoseRecord.date).all()
-    blood_pressure_records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(BloodPressureRecord.date).all()
+# @app.route('/health-logger/visual_insight_page')
+# @login_required
+# def visual_insight_page():
+#     glucose_records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(GlucoseRecord.date).all()
+#     blood_pressure_records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(BloodPressureRecord.date).all()
 
-    # Format dates to ISO format for better compatibility with JavaScript
-    glucose_dates = [record.date for record in glucose_records]  # Assuming record.date is a string in 'YYYY-MM-DD'T'HH:MM:SS' format
-    glucose_levels = [record.glucose_level for record in glucose_records]
+#     # Format dates to ISO format for better compatibility with JavaScript
+#     glucose_dates = [record.date for record in glucose_records]  # Assuming record.date is a string in 'YYYY-MM-DD'T'HH:MM:SS' format
+#     glucose_levels = [record.glucose_level for record in glucose_records]
 
-    blood_pressure_dates = [record.date for record in blood_pressure_records]  # Same assumption as above
-    systolic_levels = [record.systolic for record in blood_pressure_records]
-    diastolic_levels = [record.diastolic for record in blood_pressure_records]
+#     blood_pressure_dates = [record.date for record in blood_pressure_records]  # Same assumption as above
+#     systolic_levels = [record.systolic for record in blood_pressure_records]
+#     diastolic_levels = [record.diastolic for record in blood_pressure_records]
 
-    return render_template('pages/visual_insights.html',
-                           glucose_dates=glucose_dates,
-                           glucose_levels=glucose_levels,
-                           blood_pressure_dates=blood_pressure_dates,
-                           systolic_levels=systolic_levels,
-                           diastolic_levels=diastolic_levels)
+#     return render_template('pages/visual_insights.html',
+#                            glucose_dates=glucose_dates,
+#                            glucose_levels=glucose_levels,
+#                            blood_pressure_dates=blood_pressure_dates,
+#                            systolic_levels=systolic_levels,
+#                            diastolic_levels=diastolic_levels)
 
 @app.route('/glucose', methods=['GET', 'POST'])
 @login_required
