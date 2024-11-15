@@ -22,6 +22,10 @@ $ pip install -r requirements.txt
 
 4. Run the development server:
 ```bash
+$ python app.py
+```
+or
+```bash
 $ flask run
 ```
 
