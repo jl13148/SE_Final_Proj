@@ -4,7 +4,7 @@ from datetime import datetime, time, timedelta
 from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
 from werkzeug.exceptions import NotFound
-from app import app
+from app import app, ExportPDFForm, ExportCSVForm
 from models import User, Medication, MedicationLog, GlucoseRecord, BloodPressureRecord
 import json
 import HtmlTestRunner
@@ -748,6 +748,182 @@ class HealthAppTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
             self.mock_delete.assert_not_called()
             self.mock_commit.assert_not_called()
+
+    def test_health_reports_get(self):
+        """Test GET request to health reports page"""
+        response = self.client.get('/health-reports')
+        self.assertEqual(response.status_code, 200)
+
+    def test_export_csv_success(self):
+        """Test successful CSV export with mock data"""
+        # Mock glucose records
+        mock_glucose = MagicMock()
+        mock_glucose.date = '2024-01-01'
+        mock_glucose.time = '10:00'
+        mock_glucose.glucose_level = 120
+
+        # Mock blood pressure records
+        mock_bp = MagicMock()
+        mock_bp.date = '2024-01-01'
+        mock_bp.time = '10:30'
+        mock_bp.systolic = 120
+        mock_bp.diastolic = 80
+
+        # Patch the database queries
+        with patch('models.GlucoseRecord.query') as mock_glucose_query, \
+            patch('models.BloodPressureRecord.query') as mock_bp_query:
+            
+            # Configure mock queries
+            mock_glucose_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_glucose]
+            mock_bp_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_bp]
+
+            # Make request to export CSV
+            response = self.client.post('/export/csv')
+
+            # Assert response
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'text/csv')
+            self.assertIn('health_report_', response.headers['Content-Disposition'])
+            
+            # Verify CSV content
+            csv_data = response.data.decode('utf-8')
+            self.assertIn('Glucose Levels', csv_data)
+            self.assertIn('Blood Pressure Levels', csv_data)
+            self.assertIn('120', csv_data)  # glucose level
+            self.assertIn('80', csv_data)   # diastolic
+
+    def test_export_csv_no_records(self):
+        """Test CSV export when no health records exist"""
+        # Patch the database queries to return empty lists
+        with patch('models.GlucoseRecord.query') as mock_glucose_query, \
+            patch('models.BloodPressureRecord.query') as mock_bp_query:
+            
+            mock_glucose_query.filter_by.return_value.order_by.return_value.all.return_value = []
+            mock_bp_query.filter_by.return_value.order_by.return_value.all.return_value = []
+
+            response = self.client.post('/export/csv')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'text/csv')
+            
+            csv_data = response.data.decode('utf-8')
+            self.assertIn('No glucose records found.', csv_data)
+            self.assertIn('No blood pressure records found.', csv_data)
+
+    def test_export_csv_error(self):
+        """Test CSV export when an error occurs"""
+        # Patch the database query to raise an exception
+        with patch('models.GlucoseRecord.query') as mock_query:
+            mock_query.filter_by.side_effect = Exception('Database error')
+
+            response = self.client.post('/export/csv')
+
+            self.assertEqual(response.status_code, 302)  # Redirect on error
+            self.assertIn('/health-reports', response.location)
+
+    def test_export_pdf_success(self):
+        """Test successful PDF export with mock data"""
+        # Mock glucose records
+        mock_glucose = MagicMock()
+        mock_glucose.date = '2024-01-01'
+        mock_glucose.time = '10:00'
+        mock_glucose.glucose_level = 120
+
+        # Mock blood pressure records
+        mock_bp = MagicMock()
+        mock_bp.date = '2024-01-01'
+        mock_bp.time = '10:30'
+        mock_bp.systolic = 120
+        mock_bp.diastolic = 80
+
+        # Patch the database queries
+        with patch('models.GlucoseRecord.query') as mock_glucose_query, \
+            patch('models.BloodPressureRecord.query') as mock_bp_query:
+            
+            mock_glucose_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_glucose]
+            mock_bp_query.filter_by.return_value.order_by.return_value.all.return_value = [mock_bp]
+
+            response = self.client.post('/export/pdf')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'application/pdf')
+            self.assertIn('health_report.pdf', response.headers['Content-Disposition'])
+
+    def test_export_pdf_no_records(self):
+        """Test PDF export when no health records exist"""
+        # Patch the database queries to return empty lists
+        with patch('models.GlucoseRecord.query') as mock_glucose_query, \
+            patch('models.BloodPressureRecord.query') as mock_bp_query:
+            
+            mock_glucose_query.filter_by.return_value.order_by.return_value.all.return_value = []
+            mock_bp_query.filter_by.return_value.order_by.return_value.all.return_value = []
+
+            response = self.client.post('/export/pdf')
+
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.mimetype, 'application/pdf')
+
+    def test_export_pdf_error(self):
+        """Test PDF export when an error occurs"""
+        # Patch the database query to raise an exception
+        with patch('models.GlucoseRecord.query') as mock_query:
+            mock_query.filter_by.side_effect = Exception('Database error')
+
+            response = self.client.post('/export/pdf')
+
+            self.assertEqual(response.status_code, 302)  # Redirect on error
+            self.assertIn('/health-reports', response.location)
+
+    def test_health_reports_get(self):
+        """Test GET request to health reports page"""
+        response = self.client.get('/health-reports')
+        self.assertEqual(response.status_code, 200)
+
+    def test_health_reports_pdf_form_submission(self):
+        """Test PDF form submission on the health reports page"""
+        with patch('app.ExportPDFForm') as MockPDFForm:
+            # Configure the mock form
+            mock_form = MockPDFForm.return_value
+            mock_form.validate_on_submit.return_value = True
+            mock_form.submit.data = True
+            
+            with self.client as client:
+                response = client.post('/health-reports', data={
+                    'submit': True
+                })
+                
+                self.assertEqual(response.status_code, 302)
+                self.assertTrue(response.location.endswith('/export/pdf'))
+
+    # def test_health_reports_csv_form_submission(self):
+    #     """Test CSV form submission on the health reports page"""
+    #     with patch('app.ExportCSVForm') as MockCSVForm:
+    #         # Configure the mock form
+    #         mock_form = MockCSVForm.return_value
+    #         mock_form.validate_on_submit.return_value = True
+    #         mock_form.submit.data = True
+            
+    #         with self.client as client:
+    #             response = client.post('/health-reports', data={
+    #                 'submit': True
+    #             })
+                
+    #             self.assertEqual(response.status_code, 302)
+    #             self.assertTrue(response.location.endswith('/export/csv'))
+
+    def test_health_reports_invalid_form_submission(self):
+        """Test invalid form submission on the health reports page"""
+        with patch('app.ExportPDFForm') as MockPDFForm, \
+            patch('app.ExportCSVForm') as MockCSVForm:
+            # Configure the mock forms to fail validation
+            MockPDFForm.return_value.validate_on_submit.return_value = False
+            MockCSVForm.return_value.validate_on_submit.return_value = False
+            
+            with self.client as client:
+                response = client.post('/health-reports', data={})
+                self.assertEqual(response.status_code, 200)
+
+
 if __name__ == '__main__':
     # Use a simpler test runner if HtmlTestRunner is causing issues
     try:
