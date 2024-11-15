@@ -136,6 +136,42 @@ def delete_medication(id):
         flash('An error occurred while deleting the medication.', 'danger')
         return redirect(url_for('manage_medications'))
 
+@app.route('/medications/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_medication(id):
+    medication = Medication.query.get_or_404(id)
+    
+    # Verify ownership
+    if medication.user_id != current_user.id:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('manage_medications'))
+    
+    form = MedicationForm()
+    
+    if request.method == 'GET':
+        # Populate form with existing data
+        form.name.data = medication.name
+        form.dosage.data = medication.dosage
+        form.frequency.data = medication.frequency
+        form.time.data = medication.time
+    
+    if form.validate_on_submit():
+        try:
+            medication.name = form.name.data
+            medication.dosage = form.dosage.data
+            medication.frequency = form.frequency.data
+            medication.time = form.time.data
+            
+            db.session.commit()
+            flash('Medication updated successfully!', 'success')
+            return redirect(url_for('manage_medications'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating medication: {str(e)}', 'danger')
+            
+    return render_template('pages/edit_medication.html', form=form, medication=medication)
+
+
 # Health Logger Routes
 
 @app.route('/health-logger')
