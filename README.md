@@ -12,6 +12,7 @@ $ cd SE_Final_Proj/flask-boilerplate
 2. Initialize and activate a virtualenv:
 ```bash
 $ conda create -n <venv-name>
+$ conda activate <venv-name>
 ```
 
 3. Install the dependencies:
