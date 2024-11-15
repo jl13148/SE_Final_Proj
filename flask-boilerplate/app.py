@@ -514,8 +514,13 @@ def export_pdf():
                 if y < 50:
                     p.showPage()
                     y = height - 50
-                p.drawString(120, y, f"• {record.date} at {record.time}: {record.glucose_level} mg/dL")
                 y -= 20
+                p.drawString(120, y, f"Date: {record.date}")
+                y -= 20
+                p.drawString(120, y, f"Time: {record.time}")
+                y -= 20
+                p.drawString(120, y, f"Glucose Level: {record.glucose_level} mg/dL")
+                y -= 30
         else:
             p.drawString(120, y, "No glucose records found.")
             y -= 20
@@ -534,8 +539,14 @@ def export_pdf():
                 if y < 50:
                     p.showPage()
                     y = height - 50
-                p.drawString(120, y, f"• {record.date} at {record.time}: {record.systolic}/{record.diastolic} mm Hg")
+                p.drawString(120, y, f"Date: {record.date}")
                 y -= 20
+                p.drawString(120, y, f"Time: {record.time}")
+                y -= 20
+                p.drawString(120, y, f"Systolic: {record.systolic} mm/Hg")
+                y -= 20
+                p.drawString(120, y, f"Diastolic: {record.diastolic} mm/Hg")
+                y -= 30 
         else:
             p.drawString(120, y, "No blood pressure records found.")
             y -= 20
