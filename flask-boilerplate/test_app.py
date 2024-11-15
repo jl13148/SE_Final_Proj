@@ -415,31 +415,64 @@ class HealthAppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Glucose Logger', response.data)  # Adjust based on your template
 
+    # BVA for logging glucose value
     @patch('app.GlucoseRecord')
-    def test_glucose_post_valid_data(self, mock_glucose_record):
+    def test_glucose_post_boundary_values(self, mock_glucose_record):
         """
-        Test posting valid glucose data.
-        Expect a success message and that the record is added to the database.
+        Test glucose level input using Boundary Value Analysis
+        Valid range: 70-180 mg/dL
+        Test values: 69 (invalid), 70 (min), 71 (min+1), 179 (max-1), 180 (max), 181 (invalid)
         """
         self.login()
-        response = self.client.post('/glucose', data={
-            'glucose_level': '100',
+        test_cases = [
+            # (glucose_level, expected_status, expected_message)
+            (69, 200, b'Glucose level must be between 70 and 180 mg/dL.'),  # Below minimum
+            (70, 200, b'Glucose data logged successfully!'),  # Minimum boundary
+            (71, 200, b'Glucose data logged successfully!'),  # Just above minimum
+            (179, 200, b'Glucose data logged successfully!'), # Just below maximum
+            (180, 200, b'Glucose data logged successfully!'), # Maximum boundary
+            (181, 200, b'Glucose level must be between 70 and 180 mg/dL.')  # Above maximum
+        ]
+
+        base_data = {
             'date': '2024-11-13',
             'time': '17:00'
-        }, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Glucose data logged successfully!', response.data)
+        }
 
-        # Assert that GlucoseRecord was instantiated with correct parameters
-        mock_glucose_record.assert_called_with(
-            glucose_level=100,
-            date='2024-11-13',
-            time='17:00',
-            user_id=self.mock_user.id
-        )
-        # Assert that add and commit were called
-        self.mock_add.assert_called_once_with(mock_glucose_record.return_value)
-        self.mock_commit.assert_called_once()
+        for glucose_level, expected_status, expected_message in test_cases:
+            with self.subTest(glucose_level=glucose_level):
+                # Reset mock between test cases
+                mock_glucose_record.reset_mock()
+                self.mock_add.reset_mock()
+                self.mock_commit.reset_mock()
+
+                # Create test data
+                test_data = base_data.copy()
+                test_data['glucose_level'] = str(glucose_level)
+
+                # Make request
+                response = self.client.post('/glucose', 
+                                        data=test_data, 
+                                        follow_redirects=True)
+
+                # Assert response
+                self.assertEqual(response.status_code, expected_status)
+                self.assertIn(expected_message, response.data)
+
+                # Check if record should have been created
+                if 70 <= glucose_level <= 180:
+                    mock_glucose_record.assert_called_with(
+                        glucose_level=glucose_level,
+                        date='2024-11-13',
+                        time='17:00',
+                        user_id=self.mock_user.id
+                    )
+                    self.mock_add.assert_called_once_with(mock_glucose_record.return_value)
+                    self.mock_commit.assert_called_once()
+                else:
+                    mock_glucose_record.assert_not_called()
+                    self.mock_add.assert_not_called()
+                    self.mock_commit.assert_not_called()
 
     @patch('app.GlucoseRecord')
     def test_glucose_post_invalid_glucose_level(self, mock_glucose_record):
