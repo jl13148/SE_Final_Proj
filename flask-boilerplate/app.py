@@ -6,6 +6,7 @@ from flask import Flask, render_template, request, flash, redirect, url_for, sen
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
 import logging
+from django.db import IntegrityError
 from logging import Formatter, FileHandler
 from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm
 from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog

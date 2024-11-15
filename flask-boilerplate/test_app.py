@@ -4,6 +4,7 @@ from datetime import datetime, time, timedelta
 from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
 from werkzeug.exceptions import NotFound
+from django.db import IntegrityError
 from app import app, ExportPDFForm, ExportCSVForm
 from models import User, Medication, MedicationLog, GlucoseRecord, BloodPressureRecord
 import json
@@ -960,6 +961,331 @@ class HealthAppTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 404)
             self.mock_delete.assert_not_called()
             self.mock_commit.assert_not_called()
+    # Test cases for edit_glucose_record
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_get_success(self, mock_glucose_record_class):
+        """Test successful GET request to edit glucose record"""
+        self.login()
+        
+        # Setup mock record
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.glucose_level = 100
+        mock_record.date = "2024-01-01"
+        mock_record.time = "10:00"
+        
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.get('/glucose/edit/1')
+        
+        self.assertEqual(response.status_code, 200)
+        mock_glucose_record_class.query.get_or_404.assert_called_with(1)
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_get_unauthorized(self, mock_glucose_record_class):
+        """Test GET request with unauthorized access"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = 999  # Different from self.mock_user.id
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.get('/glucose/edit/1', follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'You do not have permission to edit this record.', response.data)
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_non_integer(self, mock_glucose_record_class):
+        """Test POST request with non-integer glucose level"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.post('/glucose/edit/1', data={
+            'glucose_level': 'abc',
+            'date': '2024-01-01',
+            'time': '10:00'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Glucose level must be an integer.', response.data)
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_invalid_range(self, mock_glucose_record_class):
+        """Test POST request with glucose level outside valid range"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.post('/glucose/edit/1', data={
+            'glucose_level': '200',  # Above MAX_GLUCOSE
+            'date': '2024-01-01',
+            'time': '10:00'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Glucose level must be between 70 and 180 mg/dL.', response.data)
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_duplicate_time(self, mock_glucose_record_class):
+        """Test POST request with duplicate date/time"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.date = "2024-01-01"
+        mock_record.time = "09:00"
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=True):
+            response = self.client.post('/glucose/edit/1', data={
+                'glucose_level': '100',
+                'date': '2024-01-01',
+                'time': '10:00'  # Different time
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'A glucose record for this date and time already exists.', response.data)
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_success(self, mock_glucose_record_class):
+        """Test successful POST request"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.date = "2024-01-01"
+        mock_record.time = "10:00"
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            response = self.client.post('/glucose/edit/1', data={
+                'glucose_level': '100',
+                'date': '2024-01-01',
+                'time': '10:00'
+            }, follow_redirects=True)
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Glucose record updated successfully!', response.data)
+            self.mock_commit.assert_called_once()
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_integrity_error(self, mock_glucose_record_class):
+        """Test POST request with database integrity error"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            self.mock_commit.side_effect = IntegrityError("", "", "")
+            
+            response = self.client.post('/glucose/edit/1', data={
+                'glucose_level': '100',
+                'date': '2024-01-01',
+                'time': '10:00'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'A glucose record for this date and time already exists.', response.data)
+            self.mock_rollback.assert_called_once()
+
+    @patch('app.GlucoseRecord')
+    def test_edit_glucose_record_post_generic_error(self, mock_glucose_record_class):
+        """Test POST request with generic database error"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_glucose_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            response = self.client.post('/glucose/edit/1', data={
+                'glucose_level': '100',
+                'date': '2024-01-01',
+                'time': '10:00'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Error updating glucose record: Database error', response.data)
+            self.mock_rollback.assert_called_once()
+
+    # Test cases for edit_blood_pressure_record
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_get_success(self, mock_bp_record_class):
+        """Test successful GET request to edit blood pressure record"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.systolic = 120
+        mock_record.diastolic = 80
+        mock_record.date = "2024-01-01"
+        mock_record.time = "10:00"
+        
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.get('/blood_pressure/edit/1')
+        
+        self.assertEqual(response.status_code, 200)
+        mock_bp_record_class.query.get_or_404.assert_called_with(1)
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_non_integer(self, mock_bp_record_class):
+        """Test POST request with non-integer blood pressure values"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.post('/blood_pressure/edit/1', data={
+            'systolic': 'abc',
+            'diastolic': 'xyz',
+            'date': '2024-01-01',
+            'time': '10:00'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Systolic and Diastolic values must be integers.', response.data)
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_invalid_systolic(self, mock_bp_record_class):
+        """Test POST request with invalid systolic value"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.post('/blood_pressure/edit/1', data={
+            'systolic': '200',  # Above MAX_SYSTOLIC
+            'diastolic': '80',
+            'date': '2024-01-01',
+            'time': '10:00'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Systolic value must be between 90 and 180 mm Hg.', response.data)
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_invalid_diastolic(self, mock_bp_record_class):
+        """Test POST request with invalid diastolic value"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        response = self.client.post('/blood_pressure/edit/1', data={
+            'systolic': '120',
+            'diastolic': '130',  # Above MAX_DIASTOLIC
+            'date': '2024-01-01',
+            'time': '10:00'
+        })
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Diastolic value must be between 60 and 120 mm Hg.', response.data)
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_duplicate_time(self, mock_bp_record_class):
+        """Test POST request with duplicate date/time"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.date = "2024-01-01"
+        mock_record.time = "09:00"
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=True):
+            response = self.client.post('/blood_pressure/edit/1', data={
+                'systolic': '120',
+                'diastolic': '80',
+                'date': '2024-01-01',
+                'time': '10:00'  # Different time
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'A blood pressure record for this date and time already exists.', response.data)
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_success(self, mock_bp_record_class):
+        """Test successful POST request"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_record.date = "2024-01-01"
+        mock_record.time = "10:00"
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            response = self.client.post('/blood_pressure/edit/1', data={
+                'systolic': '120',
+                'diastolic': '80',
+                'date': '2024-01-01',
+                'time': '10:00'
+            }, follow_redirects=True)
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Blood pressure record updated successfully!', response.data)
+            self.mock_commit.assert_called_once()
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_integrity_error(self, mock_bp_record_class):
+        """Test POST request with database integrity error"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            self.mock_commit.side_effect = IntegrityError("", "", "")
+            
+            response = self.client.post('/blood_pressure/edit/1', data={
+                'systolic': '120',
+                'diastolic': '80',
+                'date': '2024-01-01',
+                'time': '10:00'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'A blood pressure record for this date and time already exists.', response.data)
+            self.mock_rollback.assert_called_once()
+
+    @patch('app.BloodPressureRecord')
+    def test_edit_blood_pressure_record_post_generic_error(self, mock_bp_record_class):
+        """Test POST request with generic database error"""
+        self.login()
+        
+        mock_record = MagicMock()
+        mock_record.user_id = self.mock_user.id
+        mock_bp_record_class.query.get_or_404.return_value = mock_record
+        
+        with patch('app.is_duplicate_record', return_value=False):
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            response = self.client.post('/blood_pressure/edit/1', data={
+                'systolic': '120',
+                'diastolic': '80',
+                'date': '2024-01-01',
+                'time': '10:00'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'Error updating blood pressure record: Database error', response.data)
+            self.mock_rollback.assert_called_once()
+
 
     def test_health_reports_get(self):
         """Test GET request to health reports page"""
