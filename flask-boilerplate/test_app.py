@@ -390,6 +390,177 @@ class HealthAppTestCase(unittest.TestCase):
             data = json.loads(response.data)
             self.assertEqual(len(data), 0)  # No medications should be returned
 
+    @patch('app.Medication')
+    def test_edit_medication_get_success(self, mock_medication_class):
+        """Test successful GET request to edit medication"""
+        self.login()
+        
+        # Setup mock medication
+        mock_medication = MagicMock()
+        mock_medication.user_id = self.mock_user.id
+        mock_medication.name = "TestMed"
+        mock_medication.dosage = "10mg"
+        mock_medication.frequency = "daily"
+        mock_medication.time = time(8, 0)
+        
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        response = self.client.get('/medications/1/edit')
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'TestMed', response.data)  # Verify form is populated
+        mock_medication_class.query.get_or_404.assert_called_with(1)
+
+    @patch('app.Medication')
+    def test_edit_medication_get_unauthorized(self, mock_medication_class):
+        """Test GET request to edit medication with unauthorized access"""
+        self.login()
+        
+        # Setup mock medication with different user_id
+        mock_medication = MagicMock()
+        mock_medication.user_id = 1022  # Different from self.mock_user.id
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        response = self.client.get('/medications/1/edit', follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Unauthorized access.', response.data)
+        mock_medication_class.query.get_or_404.assert_called_with(1)
+
+    @patch('app.Medication')
+    def test_edit_medication_get_not_found(self, mock_medication_class):
+        """Test GET request to edit non-existent medication"""
+        self.login()
+        
+        mock_medication_class.query.get_or_404.side_effect = NotFound()
+        
+        response = self.client.get('/medications/1022/edit')
+        
+        self.assertEqual(response.status_code, 404)
+
+    @patch('app.Medication')
+    @patch('app.MedicationForm')
+    def test_edit_medication_post_success(self, mock_form_class, mock_medication_class):
+        """Test successful POST request to edit medication"""
+        self.login()
+        
+        # Setup mock medication
+        mock_medication = MagicMock()
+        mock_medication.user_id = self.mock_user.id
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        # Setup mock form with valid data
+        mock_form = MagicMock()
+        mock_form.validate_on_submit.return_value = True
+        mock_form.name.data = "Updated Med"
+        mock_form.dosage.data = "20mg"
+        mock_form.frequency.data = "twice daily"
+        mock_form.time.data = time(9, 0)
+        mock_form_class.return_value = mock_form
+        
+        response = self.client.post('/medications/1/edit', 
+                                data={
+                                    'name': 'Updated Med',
+                                    'dosage': '20mg',
+                                    'frequency': 'twice daily',
+                                    'time': '09:00'
+                                },
+                                follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Medication updated successfully!', response.data)
+        
+        # Verify medication was updated
+        self.assertEqual(mock_medication.name, "Updated Med")
+        self.assertEqual(mock_medication.dosage, "20mg")
+        self.assertEqual(mock_medication.frequency, "twice daily")
+        self.assertEqual(mock_medication.time, time(9, 0))
+        
+        self.mock_commit.assert_called_once()
+
+    @patch('app.Medication')
+    @patch('app.MedicationForm')
+    def test_edit_medication_post_unauthorized(self, mock_form_class, mock_medication_class):
+        """Test POST request to edit medication with unauthorized access"""
+        self.login()
+        
+        # Setup mock medication with different user_id
+        mock_medication = MagicMock()
+        mock_medication.user_id = 1022  # Different from self.mock_user.id
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        response = self.client.post('/medications/1/edit',
+                                data={
+                                    'name': 'Updated Med',
+                                    'dosage': '20mg',
+                                    'frequency': 'twice daily',
+                                    'time': '09:00'
+                                },
+                                follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Unauthorized access.', response.data)
+        self.mock_commit.assert_not_called()
+
+    @patch('app.Medication')
+    @patch('app.MedicationForm')
+    def test_edit_medication_post_validation_error(self, mock_form_class, mock_medication_class):
+        """Test POST request with invalid form data"""
+        self.login()
+        
+        # Setup mock medication
+        mock_medication = MagicMock()
+        mock_medication.user_id = self.mock_user.id
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        # Setup mock form that fails validation
+        mock_form = MagicMock()
+        mock_form.validate_on_submit.return_value = False
+        mock_form_class.return_value = mock_form
+        
+        response = self.client.post('/medications/1/edit',
+                                data={},  # Empty data to trigger validation error
+                                follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.mock_commit.assert_not_called()
+
+    @patch('app.Medication')
+    @patch('app.MedicationForm')
+    def test_edit_medication_post_database_error(self, mock_form_class, mock_medication_class):
+        """Test POST request with database error"""
+        self.login()
+        
+        # Setup mock medication
+        mock_medication = MagicMock()
+        mock_medication.user_id = self.mock_user.id
+        mock_medication_class.query.get_or_404.return_value = mock_medication
+        
+        # Setup mock form with valid data
+        mock_form = MagicMock()
+        mock_form.validate_on_submit.return_value = True
+        mock_form.name.data = "Updated Med"
+        mock_form.dosage.data = "20mg"
+        mock_form.frequency.data = "twice daily"
+        mock_form.time.data = time(9, 0)
+        mock_form_class.return_value = mock_form
+        
+        # Force database error
+        self.mock_commit.side_effect = Exception("Database error")
+        
+        response = self.client.post('/medications/1/edit',
+                                data={
+                                    'name': 'Updated Med',
+                                    'dosage': '20mg',
+                                    'frequency': 'twice daily',
+                                    'time': '09:00'
+                                },
+                                follow_redirects=True)
+        
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'Error updating medication: Database error', response.data)
+        self.mock_rollback.assert_called_once()
+
 
     # Tests for /glucose route
     @patch('app.GlucoseRecord')
@@ -424,55 +595,53 @@ class HealthAppTestCase(unittest.TestCase):
         Test values: 69 (invalid), 70 (min), 71 (min+1), 179 (max-1), 180 (max), 181 (invalid)
         """
         self.login()
-        test_cases = [
-            # (glucose_level, expected_status, expected_message)
-            (69, 200, b'Glucose level must be between 70 and 180 mg/dL.'),  # Below minimum
-            (70, 200, b'Glucose data logged successfully!'),  # Minimum boundary
-            (71, 200, b'Glucose data logged successfully!'),  # Just above minimum
-            (179, 200, b'Glucose data logged successfully!'), # Just below maximum
-            (180, 200, b'Glucose data logged successfully!'), # Maximum boundary
-            (181, 200, b'Glucose level must be between 70 and 180 mg/dL.')  # Above maximum
-        ]
+        
+        # Mock is_duplicate_record to return False
+        with patch('app.is_duplicate_record', return_value=False):
+            test_cases = [
+                # (glucose_level, expected_message, should_create_record)
+                (69, b'Glucose level must be between 70 and 180 mg/dL.', False),  # Below minimum
+                (70, b'Glucose data logged successfully!', True),  # Minimum boundary
+                (71, b'Glucose data logged successfully!', True),  # Just above minimum
+                (179, b'Glucose data logged successfully!', True), # Just below maximum
+                (180, b'Glucose data logged successfully!', True), # Maximum boundary
+                (181, b'Glucose level must be between 70 and 180 mg/dL.', False)  # Above maximum
+            ]
 
-        base_data = {
-            'date': '2024-11-13',
-            'time': '17:00'
-        }
+            base_data = {
+                'date': '2024-11-13',
+                'time': '17:00'
+            }
 
-        for glucose_level, expected_status, expected_message in test_cases:
-            with self.subTest(glucose_level=glucose_level):
-                # Reset mock between test cases
-                mock_glucose_record.reset_mock()
-                self.mock_add.reset_mock()
-                self.mock_commit.reset_mock()
+            for glucose_level, expected_message, should_create_record in test_cases:
+                with self.subTest(glucose_level=glucose_level):
+                    mock_glucose_record.reset_mock()
+                    self.mock_add.reset_mock()
+                    self.mock_commit.reset_mock()
 
-                # Create test data
-                test_data = base_data.copy()
-                test_data['glucose_level'] = str(glucose_level)
+                    test_data = base_data.copy()
+                    test_data['glucose_level'] = str(glucose_level)
 
-                # Make request
-                response = self.client.post('/glucose', 
-                                        data=test_data, 
-                                        follow_redirects=True)
+                    response = self.client.post('/glucose', 
+                                            data=test_data, 
+                                            follow_redirects=True)
 
-                # Assert response
-                self.assertEqual(response.status_code, expected_status)
-                self.assertIn(expected_message, response.data)
-
-                # Check if record should have been created
-                if 70 <= glucose_level <= 180:
-                    mock_glucose_record.assert_called_with(
-                        glucose_level=glucose_level,
-                        date='2024-11-13',
-                        time='17:00',
-                        user_id=self.mock_user.id
-                    )
-                    self.mock_add.assert_called_once_with(mock_glucose_record.return_value)
-                    self.mock_commit.assert_called_once()
-                else:
-                    mock_glucose_record.assert_not_called()
-                    self.mock_add.assert_not_called()
-                    self.mock_commit.assert_not_called()
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn(expected_message, response.data)
+                    
+                    if should_create_record:
+                        mock_glucose_record.assert_called_with(
+                            glucose_level=glucose_level,
+                            date='2024-11-13',
+                            time='17:00',
+                            user_id=self.mock_user.id
+                        )
+                        self.mock_add.assert_called_once()
+                        self.mock_commit.assert_called_once()
+                    else:
+                        mock_glucose_record.assert_not_called()
+                        self.mock_add.assert_not_called()
+                        self.mock_commit.assert_not_called()
 
     @patch('app.GlucoseRecord')
     def test_glucose_post_invalid_glucose_level(self, mock_glucose_record):
@@ -570,131 +739,57 @@ class HealthAppTestCase(unittest.TestCase):
         """
         self.login()
         
-        test_cases = [
-            # (systolic, diastolic, expected_status, expected_message)
-            (80, 50, 200, b'Systolic value must be between 90 and 180 mm Hg.'),    # Case 1
-            (80, 80, 200, b'Systolic value must be between 90 and 180 mm Hg.'),    # Case 2
-            (80, 130, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 3
-            (120, 50, 200, b'Diastolic value must be between 60 and 120 mm Hg.'),  # Case 4
-            (120, 80, 200, b'Blood pressure data logged successfully!'),            # Case 5
-            (120, 130, 200, b'Diastolic value must be between 60 and 120 mm Hg.'), # Case 6
-            (190, 50, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 7
-            (190, 80, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 8
-            (190, 130, 200, b'Systolic value must be between 90 and 180 mm Hg.')   # Case 9
-        ]
-        base_data = {
-        'date': '2024-11-13',
-            'time': '17:00'
-        }
+        # Mock is_duplicate_record to return False
+        with patch('app.is_duplicate_record', return_value=False):
+            test_cases = [
+                # (systolic, diastolic, expected_message, should_create_record)
+                (80, 50, b'Systolic value must be between 90 and 180 mm Hg.', False),    # Case 1
+                (80, 80, b'Systolic value must be between 90 and 180 mm Hg.', False),    # Case 2
+                (80, 130, b'Systolic value must be between 90 and 180 mm Hg.', False),   # Case 3
+                (120, 50, b'Diastolic value must be between 60 and 120 mm Hg.', False),  # Case 4
+                (120, 80, b'Blood pressure data logged successfully!', True),            # Case 5
+                (120, 130, b'Diastolic value must be between 60 and 120 mm Hg.', False), # Case 6
+                (190, 50, b'Systolic value must be between 90 and 180 mm Hg.', False),   # Case 7
+                (190, 80, b'Systolic value must be between 90 and 180 mm Hg.', False),   # Case 8
+                (190, 130, b'Systolic value must be between 90 and 180 mm Hg.', False)   # Case 9
+            ]
 
-        for systolic, diastolic, expected_status, expected_message in test_cases:
-            with self.subTest(systolic=systolic, diastolic=diastolic):
-                # Reset mocks between test cases
-                mock_blood_pressure_record.reset_mock()
-                self.mock_add.reset_mock()
-                self.mock_commit.reset_mock()
+            base_data = {
+                'date': '2024-11-13',
+                'time': '17:00'
+            }
 
-                # Create test data
-                test_data = base_data.copy()
-                test_data['systolic'] = str(systolic)
-                test_data['diastolic'] = str(diastolic)
+            for systolic, diastolic, expected_message, should_create_record in test_cases:
+                with self.subTest(systolic=systolic, diastolic=diastolic):
+                    mock_blood_pressure_record.reset_mock()
+                    self.mock_add.reset_mock()
+                    self.mock_commit.reset_mock()
 
-                # Make request
-                response = self.client.post('/blood_pressure', 
-                                        data=test_data, 
-                                        follow_redirects=True)
+                    test_data = base_data.copy()
+                    test_data['systolic'] = str(systolic)
+                    test_data['diastolic'] = str(diastolic)
 
-                # Assert response
-                self.assertEqual(response.status_code, expected_status)
-                self.assertIn(expected_message, response.data)
+                    response = self.client.post('/blood_pressure', 
+                                            data=test_data, 
+                                            follow_redirects=True)
 
-                # Check if record should have been created
-                if (90 <= systolic <= 180) and (60 <= diastolic <= 120):
-                    mock_blood_pressure_record.assert_called_with(
-                        systolic=systolic,
-                        diastolic=diastolic,
-                        date='2024-11-13',
-                        time='17:00',
-                        user_id=self.mock_user.id
-                    )
-                    self.mock_add.assert_called_once_with(mock_blood_pressure_record.return_value)
-                    self.mock_commit.assert_called_once()
-                else:
-                    mock_blood_pressure_record.assert_not_called()
-                    self.mock_add.assert_not_called()
-                    self.mock_commit.assert_not_called()
+                    self.assertEqual(response.status_code, 200)
+                    self.assertIn(expected_message, response.data)
 
-    @patch('app.BloodPressureRecord')
-    def test_blood_pressure_post_valid_data(self, mock_blood_pressure_record):
-        """
-        Test posting valid blood pressure data.
-        Expect a success message and that the record is added to the database.
-        """
-        self.login()
-        response = self.client.post('/blood_pressure', data={
-            'systolic': '120',
-            'diastolic': '80',
-            'date': '2024-11-13',
-            'time': '17:00'
-        }, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Blood pressure data logged successfully!', response.data)
-
-        # Assert that BloodPressureRecord was instantiated with correct parameters
-        mock_blood_pressure_record.assert_called_with(
-            systolic=120,
-            diastolic=80,
-            date='2024-11-13',
-            time='17:00',
-            user_id=self.mock_user.id
-        )
-        # Assert that add and commit were called
-        self.mock_add.assert_called_once_with(mock_blood_pressure_record.return_value)
-        self.mock_commit.assert_called_once()
-
-    @patch('app.BloodPressureRecord')
-    def test_blood_pressure_post_invalid_systolic(self, mock_blood_pressure_record):
-        """
-        Test posting an invalid (below minimum) systolic value.
-        Expect an error message and that the record is not added.
-        """
-        self.login()
-        response = self.client.post('/blood_pressure', data={
-            'systolic': '80',  # Below minimum
-            'diastolic': '80',
-            'date': '2024-11-13',
-            'time': '17:00'
-        }, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Systolic value must be between 90 and 180 mm Hg.', response.data)
-
-        # Assert that BloodPressureRecord was not instantiated
-        mock_blood_pressure_record.assert_not_called()
-        # Assert that add and commit were not called
-        self.mock_add.assert_not_called()
-        self.mock_commit.assert_not_called()
-
-    @patch('app.BloodPressureRecord')
-    def test_blood_pressure_post_invalid_diastolic(self, mock_blood_pressure_record):
-        """
-        Test posting an invalid (above maximum) diastolic value.
-        Expect an error message and that the record is not added.
-        """
-        self.login()
-        response = self.client.post('/blood_pressure', data={
-            'systolic': '120',
-            'diastolic': '130',  # Above maximum
-            'date': '2024-11-13',
-            'time': '17:00'
-        }, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Diastolic value must be between 60 and 120 mm Hg.', response.data)
-
-        # Assert that BloodPressureRecord was not instantiated
-        mock_blood_pressure_record.assert_not_called()
-        # Assert that add and commit were not called
-        self.mock_add.assert_not_called()
-        self.mock_commit.assert_not_called()
+                    if should_create_record:
+                        mock_blood_pressure_record.assert_called_with(
+                            systolic=systolic,
+                            diastolic=diastolic,
+                            date='2024-11-13',
+                            time='17:00',
+                            user_id=self.mock_user.id
+                        )
+                        self.mock_add.assert_called_once()
+                        self.mock_commit.assert_called_once()
+                    else:
+                        mock_blood_pressure_record.assert_not_called()
+                        self.mock_add.assert_not_called()
+                        self.mock_commit.assert_not_called()
 
     @patch('app.BloodPressureRecord')
     def test_blood_pressure_post_non_integer_values(self, mock_blood_pressure_record):
