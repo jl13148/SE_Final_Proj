@@ -3,7 +3,7 @@
 Code based on flask-boilerplate https://github.com/realpython/flask-boilerplate.git
 
 ## Starting the webpage
-1. Clone the reop
+1. Clone the repo
 ```bash
 $ git clone https://github.com/jl13148/SE_Final_Proj.git
 $ cd SE_Final_Proj/flask-boilerplate
