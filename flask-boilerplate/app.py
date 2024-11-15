@@ -280,6 +280,134 @@ def record_blood_pressure():
 
     return render_template('pages/blood_pressure_logger.html')
 
+@app.route('/glucose/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_glucose_record(id):
+    """
+    Edit an existing glucose record.
+
+    :param id: ID of the glucose record to edit.
+    """
+    record = GlucoseRecord.query.get_or_404(id)
+
+    # Verify ownership
+    if record.user_id != current_user.id:
+        flash("You do not have permission to edit this record.", 'danger')
+        return redirect(url_for('glucose_logger'))
+
+    if request.method == 'POST':
+        try:
+            new_glucose_level = int(request.form['glucose_level'])
+        except ValueError:
+            flash('Glucose level must be an integer.', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
+        
+        # Validate glucose level boundaries
+        MIN_GLUCOSE = 70    # Minimum acceptable glucose level in mg/dL
+        MAX_GLUCOSE = 180   # Maximum acceptable glucose level in mg/dL
+
+        if not (MIN_GLUCOSE <= new_glucose_level <= MAX_GLUCOSE):
+            flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
+
+        date_str = request.form['date']
+        time_str = request.form['time']
+
+        # Check for duplicate record only if date or time has changed
+        if (date_str != record.date or time_str != record.time) and is_duplicate_record(GlucoseRecord, current_user.id, date_str, time_str):
+            flash('A glucose record for this date and time already exists.', 'warning')
+            return render_template('pages/edit_glucose_record.html', record=record)
+
+        # Update the record
+        record.glucose_level = new_glucose_level
+        record.date = date_str
+        record.time = time_str
+
+        try:
+            db.session.commit()
+            flash('Glucose record updated successfully!', 'success')
+            return redirect(url_for('glucose_logger'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('A glucose record for this date and time already exists.', 'warning')
+            return render_template('pages/edit_glucose_record.html', record=record)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating glucose record: {str(e)}', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
+
+    return render_template('pages/edit_glucose_record.html', record=record)
+
+#----------------------------------------------------------------------------#
+# Edit Blood Pressure Record Route
+#----------------------------------------------------------------------------#
+
+@app.route('/blood_pressure/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_blood_pressure_record(id):
+    """
+    Edit an existing blood pressure record.
+
+    :param id: ID of the blood pressure record to edit.
+    """
+    record = BloodPressureRecord.query.get_or_404(id)
+
+    # Verify ownership
+    if record.user_id != current_user.id:
+        flash("You do not have permission to edit this record.", 'danger')
+        return redirect(url_for('blood_pressure_logger'))
+
+    if request.method == 'POST':
+        try:
+            new_systolic = int(request.form['systolic'])
+            new_diastolic = int(request.form['diastolic'])
+        except ValueError:
+            flash('Systolic and Diastolic values must be integers.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        # Validate blood pressure ranges
+        MIN_SYSTOLIC = 90
+        MAX_SYSTOLIC = 180
+        MIN_DIASTOLIC = 60
+        MAX_DIASTOLIC = 120
+
+        if not (MIN_SYSTOLIC <= new_systolic <= MAX_SYSTOLIC):
+            flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        if not (MIN_DIASTOLIC <= new_diastolic <= MAX_DIASTOLIC):
+            flash(f'Diastolic value must be between {MIN_DIASTOLIC} and {MAX_DIASTOLIC} mm Hg.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        date_str = request.form['date']
+        time_str = request.form['time']
+
+        # Check for duplicate record only if date or time has changed
+        if (date_str != record.date or time_str != record.time) and is_duplicate_record(BloodPressureRecord, current_user.id, date_str, time_str):
+            flash('A blood pressure record for this date and time already exists.', 'warning')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        # Update the record
+        record.systolic = new_systolic
+        record.diastolic = new_diastolic
+        record.date = date_str
+        record.time = time_str
+
+        try:
+            db.session.commit()
+            flash('Blood pressure record updated successfully!', 'success')
+            return redirect(url_for('blood_pressure_logger'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('A blood pressure record for this date and time already exists.', 'warning')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating blood pressure record: {str(e)}', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+    return render_template('pages/edit_blood_pressure_record.html', record=record)
+
 # Medication Logging Route
 
 @app.route('/medications/log/<int:medication_id>', methods=['POST'])
