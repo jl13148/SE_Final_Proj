@@ -274,9 +274,9 @@ def log_medication(medication_id):
 @login_required
 def medication_schedule():
     try:
-        return render_template('pages/medication_schedule.html')
+        return render_template('pages/medication-schedule.html')
     except Exception as e:
-        flash('Error loading schedule. Please try again.', 'danger')
+        flash(f'Error loading schedule. Please try again. {e}', 'danger')
         return redirect(url_for('home'))
 
 @app.route('/medications/daily')
