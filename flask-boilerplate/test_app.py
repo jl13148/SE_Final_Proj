@@ -415,31 +415,64 @@ class HealthAppTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Glucose Logger', response.data)  # Adjust based on your template
 
+    # BVA for logging glucose value
     @patch('app.GlucoseRecord')
-    def test_glucose_post_valid_data(self, mock_glucose_record):
+    def test_glucose_post_boundary_values(self, mock_glucose_record):
         """
-        Test posting valid glucose data.
-        Expect a success message and that the record is added to the database.
+        Test glucose level input using Boundary Value Analysis
+        Valid range: 70-180 mg/dL
+        Test values: 69 (invalid), 70 (min), 71 (min+1), 179 (max-1), 180 (max), 181 (invalid)
         """
         self.login()
-        response = self.client.post('/glucose', data={
-            'glucose_level': '100',
+        test_cases = [
+            # (glucose_level, expected_status, expected_message)
+            (69, 200, b'Glucose level must be between 70 and 180 mg/dL.'),  # Below minimum
+            (70, 200, b'Glucose data logged successfully!'),  # Minimum boundary
+            (71, 200, b'Glucose data logged successfully!'),  # Just above minimum
+            (179, 200, b'Glucose data logged successfully!'), # Just below maximum
+            (180, 200, b'Glucose data logged successfully!'), # Maximum boundary
+            (181, 200, b'Glucose level must be between 70 and 180 mg/dL.')  # Above maximum
+        ]
+
+        base_data = {
             'date': '2024-11-13',
             'time': '17:00'
-        }, follow_redirects=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertIn(b'Glucose data logged successfully!', response.data)
+        }
 
-        # Assert that GlucoseRecord was instantiated with correct parameters
-        mock_glucose_record.assert_called_with(
-            glucose_level=100,
-            date='2024-11-13',
-            time='17:00',
-            user_id=self.mock_user.id
-        )
-        # Assert that add and commit were called
-        self.mock_add.assert_called_once_with(mock_glucose_record.return_value)
-        self.mock_commit.assert_called_once()
+        for glucose_level, expected_status, expected_message in test_cases:
+            with self.subTest(glucose_level=glucose_level):
+                # Reset mock between test cases
+                mock_glucose_record.reset_mock()
+                self.mock_add.reset_mock()
+                self.mock_commit.reset_mock()
+
+                # Create test data
+                test_data = base_data.copy()
+                test_data['glucose_level'] = str(glucose_level)
+
+                # Make request
+                response = self.client.post('/glucose', 
+                                        data=test_data, 
+                                        follow_redirects=True)
+
+                # Assert response
+                self.assertEqual(response.status_code, expected_status)
+                self.assertIn(expected_message, response.data)
+
+                # Check if record should have been created
+                if 70 <= glucose_level <= 180:
+                    mock_glucose_record.assert_called_with(
+                        glucose_level=glucose_level,
+                        date='2024-11-13',
+                        time='17:00',
+                        user_id=self.mock_user.id
+                    )
+                    self.mock_add.assert_called_once_with(mock_glucose_record.return_value)
+                    self.mock_commit.assert_called_once()
+                else:
+                    mock_glucose_record.assert_not_called()
+                    self.mock_add.assert_not_called()
+                    self.mock_commit.assert_not_called()
 
     @patch('app.GlucoseRecord')
     def test_glucose_post_invalid_glucose_level(self, mock_glucose_record):
@@ -506,6 +539,90 @@ class HealthAppTestCase(unittest.TestCase):
         response = self.client.get('/blood_pressure')
         self.assertEqual(response.status_code, 200)
         self.assertIn(b'Blood Pressure Logger', response.data)  # Adjust based on your template
+    
+    # strong equivalance partitions for logging blood pressure
+    @patch('app.BloodPressureRecord')
+    def test_blood_pressure_post_strong_equivalence_partitions(self, mock_blood_pressure_record):
+        """
+        Test blood pressure logging using Strong Equivalence Partitioning
+        
+        Partitions:
+        Systolic (S):
+        - S1: Invalid low: < 90 mm Hg
+        - S2: Valid: 90-180 mm Hg
+        - S3: Invalid high: > 180 mm Hg
+        
+        Diastolic (D):
+        - D1: Invalid low: < 60 mm Hg
+        - D2: Valid: 60-120 mm Hg
+        - D3: Invalid high: > 120 mm Hg
+        
+        Test cases (strong equivalence testing - all combinations):
+        1. (S1,D1): (80,50) - Both invalid low
+        2. (S1,D2): (80,80) - Invalid low systolic, Valid diastolic
+        3. (S1,D3): (80,130) - Invalid low systolic, Invalid high diastolic
+        4. (S2,D1): (120,50) - Valid systolic, Invalid low diastolic
+        5. (S2,D2): (120,80) - Both valid
+        6. (S2,D3): (120,130) - Valid systolic, Invalid high diastolic
+        7. (S3,D1): (190,50) - Invalid high systolic, Invalid low diastolic
+        8. (S3,D2): (190,80) - Invalid high systolic, Valid diastolic
+        9. (S3,D3): (190,130) - Both invalid high
+        """
+        self.login()
+        
+        test_cases = [
+            # (systolic, diastolic, expected_status, expected_message)
+            (80, 50, 200, b'Systolic value must be between 90 and 180 mm Hg.'),    # Case 1
+            (80, 80, 200, b'Systolic value must be between 90 and 180 mm Hg.'),    # Case 2
+            (80, 130, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 3
+            (120, 50, 200, b'Diastolic value must be between 60 and 120 mm Hg.'),  # Case 4
+            (120, 80, 200, b'Blood pressure data logged successfully!'),            # Case 5
+            (120, 130, 200, b'Diastolic value must be between 60 and 120 mm Hg.'), # Case 6
+            (190, 50, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 7
+            (190, 80, 200, b'Systolic value must be between 90 and 180 mm Hg.'),   # Case 8
+            (190, 130, 200, b'Systolic value must be between 90 and 180 mm Hg.')   # Case 9
+        ]
+        base_data = {
+        'date': '2024-11-13',
+            'time': '17:00'
+        }
+
+        for systolic, diastolic, expected_status, expected_message in test_cases:
+            with self.subTest(systolic=systolic, diastolic=diastolic):
+                # Reset mocks between test cases
+                mock_blood_pressure_record.reset_mock()
+                self.mock_add.reset_mock()
+                self.mock_commit.reset_mock()
+
+                # Create test data
+                test_data = base_data.copy()
+                test_data['systolic'] = str(systolic)
+                test_data['diastolic'] = str(diastolic)
+
+                # Make request
+                response = self.client.post('/blood_pressure', 
+                                        data=test_data, 
+                                        follow_redirects=True)
+
+                # Assert response
+                self.assertEqual(response.status_code, expected_status)
+                self.assertIn(expected_message, response.data)
+
+                # Check if record should have been created
+                if (90 <= systolic <= 180) and (60 <= diastolic <= 120):
+                    mock_blood_pressure_record.assert_called_with(
+                        systolic=systolic,
+                        diastolic=diastolic,
+                        date='2024-11-13',
+                        time='17:00',
+                        user_id=self.mock_user.id
+                    )
+                    self.mock_add.assert_called_once_with(mock_blood_pressure_record.return_value)
+                    self.mock_commit.assert_called_once()
+                else:
+                    mock_blood_pressure_record.assert_not_called()
+                    self.mock_add.assert_not_called()
+                    self.mock_commit.assert_not_called()
 
     @patch('app.BloodPressureRecord')
     def test_blood_pressure_post_valid_data(self, mock_blood_pressure_record):
