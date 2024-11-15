@@ -8,6 +8,7 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from logging import Formatter, FileHandler
 from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog
 from datetime import datetime
 import io
 import csv
@@ -35,7 +36,7 @@ app = Flask(__name__,
 app.config.from_object('config')  # Ensure you have a config.py with necessary configurations
 
 # Initialize the database
-db = SQLAlchemy(app)
+db.init_app(app)
 
 # Initialize Flask-Migrate
 migrate = Migrate(app, db)
@@ -44,66 +45,6 @@ migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'  # Redirect to 'login' route if not authenticated
-
-#----------------------------------------------------------------------------#
-# Models
-#----------------------------------------------------------------------------#
-
-# Assuming models are defined in a separate file (models.py), but defining here for completeness
-class User(UserMixin, db.Model):
-    __tablename__ = 'users'
-    id = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(64), unique=True, nullable=False)
-    email = db.Column(db.String(120), unique=True, nullable=False)
-    password_hash = db.Column(db.String(128), nullable=False)
-    # Relationships
-    medications = db.relationship('Medication', backref='user', lazy=True)
-    glucose_records = db.relationship('GlucoseRecord', backref='user', lazy=True)
-    blood_pressure_records = db.relationship('BloodPressureRecord', backref='user', lazy=True)
-    medication_logs = db.relationship('MedicationLog', backref='user', lazy=True)
-
-    def set_password(self, password):
-        from werkzeug.security import generate_password_hash
-        self.password_hash = generate_password_hash(password)
-
-    def check_password(self, password):
-        from werkzeug.security import check_password_hash
-        return check_password_hash(self.password_hash, password)
-
-class Medication(db.Model):
-    __tablename__ = 'medications'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(120), nullable=False)
-    dosage = db.Column(db.String(64), nullable=False)
-    frequency = db.Column(db.String(64), nullable=False)
-    time = db.Column(db.Time, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    # Relationships
-    medication_logs = db.relationship('MedicationLog', backref='medication', lazy=True)
-
-class MedicationLog(db.Model):
-    __tablename__ = 'medication_logs'
-    id = db.Column(db.Integer, primary_key=True)
-    taken_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
-    medication_id = db.Column(db.Integer, db.ForeignKey('medications.id'), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
-class GlucoseRecord(db.Model):
-    __tablename__ = 'glucose_records'
-    id = db.Column(db.Integer, primary_key=True)
-    glucose_level = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    time = db.Column(db.Time, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-
-class BloodPressureRecord(db.Model):
-    __tablename__ = 'blood_pressure_records'
-    id = db.Column(db.Integer, primary_key=True)
-    systolic = db.Column(db.Integer, nullable=False)
-    diastolic = db.Column(db.Integer, nullable=False)
-    date = db.Column(db.Date, nullable=False)
-    time = db.Column(db.Time, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
 #----------------------------------------------------------------------------#
 # User Loader for Flask-Login
