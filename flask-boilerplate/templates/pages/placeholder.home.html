@@ -1,5 +1,5 @@
 {% extends 'layouts/main.html' %}
-{% block title %}DiabetesEase - Smart Diabetes Management{% endblock %}
+{% block page_title %}DiabetesEase - Smart Diabetes Management{% endblock %}
 
 {% block content %}
 <!-- Hero Section with Wave -->
@@ -13,7 +13,7 @@
             </div>
             <div class="col-lg-6 text-center">
                 <div class="floating-animation">
-                    <img src="/static/img/Diabetes.png" alt="Diabetes Management" class="img-fluid">
+                    <img src="{{ url_for('static', filename='img/Diabetes.png') }}" alt="Diabetes Management" class="img-fluid">
                 </div>
             </div>
         </div>
@@ -64,26 +64,32 @@
                             <li><span class="check-icon">✓</span> Blood pressure log</li>
                             <li><span class="check-icon">✓</span> Visual insights</li>
                         </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
                     </div>
                 </a>
             </div>
-        </div>
-    </div>
 
             <!-- Health Reports -->
             <div class="col-md-4">
-                <div class="feature-card">
-                    <div class="icon-wrapper">
-                        <i class="fas fa-file-export"></i>
+                <a href="{{ url_for('health_reports') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-file-export"></i>
+                        </div>
+                        <h3>Health Reports</h3>
+                        <p>Share your health data with healthcare providers instantly.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> PDF reports</li>
+                            <li><span class="check-icon">✓</span> CSV export</li>
+                            <li><span class="check-icon">✓</span> Secure sharing</li>
+                        </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
                     </div>
-                    <h3>Health Reports</h3>
-                    <p>Share your health data with healthcare providers instantly.</p>
-                    <ul class="feature-list">
-                        <li><span class="check-icon">✓</span> PDF reports</li>
-                        <li><span class="check-icon">✓</span> CSV export</li>
-                        <li><span class="check-icon">✓</span> Secure sharing</li>
-                    </ul>
-                </div>
+                </a>
             </div>
         </div>
     </div>
@@ -98,6 +104,7 @@
         {% endif %}
     </div>
 </div>
+{% endblock %}
 
 {% block extra_css %}
 <style>
@@ -109,8 +116,6 @@
     --text-color: #444343;
     --light-bg: #f8f9fa;
 }
-
-/* Your existing styles remain the same */
 
 /* New styles for clickable cards */
 .feature-card-link {
@@ -129,6 +134,12 @@
 .feature-card {
     position: relative;
     overflow: hidden;
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    height: 100%;
 }
 
 .card-arrow {
@@ -150,7 +161,7 @@
     border-color: var(--primary-dark);
 }
 
-/* Rest of your existing styles remain the same */
+/* Hero Section */
 .hero-section {
     background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
     padding-bottom: 100px;
@@ -175,26 +186,7 @@
     100% { transform: translateY(0px); }
 }
 
-.feature-card {
-    background: white;
-    border-radius: 15px;
-    padding: 2rem;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
-    transition: all 0.3s ease;
-    height: 100%;
-}
-
-.feature-card-link {
-    display: block;
-    text-decoration: none;
-    color: inherit;
-}
-
-.feature-card-link:visited,
-.feature-card-link:active {
-    color: inherit;
-}
-
+/* Hover Effects */
 .feature-card:hover {
     transform: translateY(-10px);
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
@@ -260,5 +252,4 @@
     }
 }
 </style>
-{% endblock %}
 {% endblock %}

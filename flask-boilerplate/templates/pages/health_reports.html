@@ -1,0 +1,61 @@
+{% extends 'layouts/main.html' %}
+
+{% block page_title %}Health Reports - DiabetesEase{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <h1 class="mb-4">Health Reports</h1>
+    <!-- Nav tabs -->
+    <ul class="nav nav-tabs" id="reportTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active" id="pdf-tab" data-toggle="tab" href="#pdf" role="tab" aria-controls="pdf" aria-selected="true">PDF Exportation</a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link" id="csv-tab" data-toggle="tab" href="#csv" role="tab" aria-controls="csv" aria-selected="false">CSV Exportation</a>
+        </li>
+    </ul>
+
+    <!-- Tab panes -->
+    <div class="tab-content" id="reportTabsContent">
+        <div class="tab-pane fade show active p-4" id="pdf" role="tabpanel" aria-labelledby="pdf-tab">
+            <h3>Download PDF Report</h3>
+            <p>Click the button below to download your health data in PDF format.</p>
+            <form action="{{ url_for('export_pdf') }}" method="post">
+                <!-- Add CSRF token here if using Flask-WTF -->
+                <button type="submit" class="btn btn-primary">Download PDF</button>
+            </form>
+        </div>
+        <div class="tab-pane fade p-4" id="csv" role="tabpanel" aria-labelledby="csv-tab">
+            <h3>Download CSV Report</h3>
+            <p>Click the button below to download your health data in CSV format.</p>
+            <form action="{{ url_for('export_csv') }}" method="post">
+                <!-- Add CSRF token here if using Flask-WTF -->
+                <button type="submit" class="btn btn-success">Download CSV</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+/* Optional: Add custom styles for the Health Reports page */
+
+.nav-tabs .nav-link {
+    color: var(--text-color);
+}
+
+.nav-tabs .nav-link.active {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.tab-content {
+    background-color: white;
+    border: 1px solid #dee2e6;
+    border-top: none;
+    border-radius: 0 0 0.25rem 0.25rem;
+    margin-top: -1px; /* To fix border overlap */
+}
+</style>
+{% endblock %}

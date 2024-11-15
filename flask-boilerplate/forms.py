@@ -48,3 +48,9 @@ class MedicationForm(FlaskForm):
                           validators=[DataRequired()])
     time = TimeField('Time', validators=[DataRequired()])
     submit = SubmitField('Save Medication')
+
+class ExportPDFForm(FlaskForm):
+    submit = SubmitField('Download PDF')
+
+class ExportCSVForm(FlaskForm):
+    submit = SubmitField('Download CSV')
