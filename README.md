@@ -22,7 +22,7 @@ $ pip install -r requirements.txt
 
 4. Run the development server:
 ```bash
-$ python app.py
+$ flask run
 ```
 
 5. Navigate to http://localhost:5000
