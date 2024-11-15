@@ -27,11 +27,3 @@ $ flask run
 
 5. Navigate to http://localhost:5000
 
-## Main changes to the boilerplate
-1. form.py: LoginForm RegisterForm
-
-2. models.py: User Medication
-  
-3. app.py: controller
-
-4. /templates/pages/placeholder.home.html: home display
