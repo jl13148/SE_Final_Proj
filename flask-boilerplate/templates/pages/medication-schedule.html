@@ -1,4 +1,3 @@
-<!-- templates/pages/medication-schedule.html -->
 {% extends 'layouts/main.html' %}
 {% block page_title %}Daily Medication Schedule - DiabetesEase{% endblock %}
 
@@ -31,6 +30,7 @@
         </div>
     </div>
 </div>
+
 {% endblock %}
 
 {% block extra_css %}
@@ -153,13 +153,14 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    async function logMedication(medicationId, button) {
+    async function logMedication(medicationId, time, button) {
         try {
             const response = await fetch(`/medications/log/${medicationId}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
-                }
+                },
+                body: JSON.stringify({ time: time })
             });
             
             if (response.ok) {
@@ -173,11 +174,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert(data.message || 'Failed to log medication');
             }
         } catch (error) {
-            console.error('Error:', error);
+            console.error('Error logging medication:', error);
             alert('Error logging medication');
         }
     }
-
 
     function displaySchedule(medications) {
         if (!Array.isArray(medications)) {
@@ -204,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
                 <div class="medication-actions">
                     <button 
-                        onclick="logMedication(${med.id}, this)"
+                        onclick="logMedication(${med.id}, '${med.time}', this)"
                         class="${med.taken ? 'btn-taken' : 'btn-not-taken'}"
                         ${med.taken ? 'disabled' : ''}>
                         ${med.taken ? 'Taken ✓' : 'Mark as Taken'}
@@ -222,6 +222,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make logMedication available globally
     window.logMedication = logMedication;
     
+    // Request Notification Permission
+    if (Notification.permission !== "granted") {
+        Notification.requestPermission();
+    }
+
     // Check for reminders every minute
     setInterval(async () => {
         try {

@@ -55,11 +55,22 @@ class Medication(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
     dosage = db.Column(db.String(120), nullable=False)
-    frequency = db.Column(db.String(120), nullable=False)  # Keep this for backward compatibility
-    time = db.Column(db.Time, nullable=False)
+    frequency = db.Column(db.Integer, nullable=False)  # Number of times per day
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
+    times = db.relationship('MedicationTime', backref='medication', cascade="all, delete-orphan", lazy=True)
     logs = db.relationship('MedicationLog', backref='medication', lazy=True)
+
+class MedicationTime(db.Model):
+    __tablename__ = 'medication_times'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    time = db.Column(db.Time, nullable=False)
+    medication_id = db.Column(db.Integer, db.ForeignKey('medications.id'), nullable=False)
+    
+    __table_args__ = (
+        db.UniqueConstraint('medication_id', 'time', name='_med_time_uc'),
+    )
 
 class MedicationLog(db.Model):
     __tablename__ = 'medication_logs'
@@ -69,10 +80,8 @@ class MedicationLog(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     taken_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     
-    # Remove the duplicate relationship definitions
     user = db.relationship('User', backref='medication_logs', lazy=True)
 
-    
 class GlucoseRecord(db.Model):
     __tablename__ = 'glucose_records'
     

@@ -8,9 +8,13 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from django.db import IntegrityError
 from logging import Formatter, FileHandler
-from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm
-from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog
+from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm, MedicationTimeForm
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog, MedicationTime
 from datetime import datetime
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField, IntegerField, FieldList, FormField, TimeField
+from wtforms.validators import DataRequired, Length, NumberRange
+from sqlalchemy.exc import IntegrityError
 import io
 import csv
 import os
@@ -67,8 +71,6 @@ def home():
 def about():
     return render_template('pages/about.html')
 
-# Medication Management Routes
-
 @app.route('/medications')
 @login_required
 def medications():
@@ -77,14 +79,8 @@ def medications():
 @app.route('/medications/manage')
 @login_required
 def manage_medications():
-    try:
-        medications = Medication.query.filter_by(user_id=current_user.id).all()
-        return render_template('pages/medications.html', 
-                               medications=medications,
-                               is_personal=True)
-    except Exception as e:
-        flash('Error loading medications. Please try again.', 'danger')
-        return redirect(url_for('home'))
+    medications = Medication.query.filter_by(user_id=current_user.id).all()
+    return render_template('pages/medications.html', medications=medications, is_personal=True)
 
 @app.route('/medications/add', methods=['GET', 'POST'])
 @login_required
@@ -92,85 +88,195 @@ def add_medication():
     form = MedicationForm()
     if form.validate_on_submit():
         try:
-            # Create new medication with the form data
             medication = Medication(
                 name=form.name.data,
                 dosage=form.dosage.data,
                 frequency=form.frequency.data,
-                time=form.time.data,
                 user_id=current_user.id
             )
-            
             db.session.add(medication)
+            db.session.flush()  # Get medication.id
+
+            for time_form in form.times.entries:
+                med_time = MedicationTime(
+                    time=time_form.form.time.data,
+                    medication_id=medication.id
+                )
+                db.session.add(med_time)
+
             db.session.commit()
-            
             flash('Medication added successfully!', 'success')
             return redirect(url_for('manage_medications'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('Medication with this name already exists.', 'danger')
         except Exception as e:
             db.session.rollback()
-            flash(f'Error adding medication: {str(e)}', 'danger')
-            return redirect(url_for('add_medication'))
-    
+            flash(f'An error occurred: {str(e)}', 'danger')
+
     return render_template('pages/add_medication.html', form=form)
 
-@app.route('/medications/<int:id>/delete', methods=['POST'])
+@app.route('/medications/daily')
 @login_required
-def delete_medication(id):
+def get_daily_medications():
     try:
-        medication = Medication.query.get_or_404(id)
-        # Check if the medication belongs to the current user
-        if medication.user_id != current_user.id:
-            flash('Unauthorized action.', 'danger')
-            return redirect(url_for('medications'))
-            
-        # Delete associated logs first
-        MedicationLog.query.filter_by(medication_id=id).delete()
-        
-        # Delete the medication
-        db.session.delete(medication)
+        today = datetime.now().date()
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
+        schedule = []
+        for med in medications:
+            for med_time in med.times:
+                taken = MedicationLog.query.filter_by(
+                    medication_id=med.id,
+                    user_id=current_user.id
+                ).filter(
+                    db.func.date(MedicationLog.taken_at) == today,
+                    db.func.time(MedicationLog.taken_at) == med_time.time
+                ).first() is not None
+                schedule.append({
+                    'id': med.id,
+                    'name': med.name,
+                    'dosage': med.dosage,
+                    'time': med_time.time.strftime('%I:%M %p'),
+                    'taken': taken
+                })
+        schedule.sort(key=lambda x: datetime.strptime(x['time'], '%I:%M %p'))
+        return jsonify(schedule), 200
+    except Exception as e:
+        return jsonify({'message': f'An error occurred: {str(e)}'}), 500
+
+@app.route('/medications/log/<int:medication_id>', methods=['POST'])
+@login_required
+def log_medication(medication_id):
+    try:
+        med = Medication.query.get_or_404(medication_id)
+        if med.user_id != current_user.id:
+            return jsonify({'message': 'Unauthorized access.'}), 403
+
+        data = request.get_json()
+        intake_time_str = data.get('time')
+        if not intake_time_str:
+            return jsonify({'message': 'Intake time not provided.'}), 400
+
+        intake_time = datetime.strptime(intake_time_str, '%I:%M %p').time()
+        today = datetime.now().date()
+
+        existing_log = MedicationLog.query.filter_by(
+            medication_id=med.id,
+            user_id=current_user.id
+        ).filter(
+            db.func.date(MedicationLog.taken_at) == today,
+            db.func.time(MedicationLog.taken_at) == intake_time
+        ).first()
+
+        if existing_log:
+            return jsonify({'message': 'Medication already marked as taken.'}), 400
+
+        log = MedicationLog(
+            medication_id=med.id,
+            user_id=current_user.id,
+            taken_at=datetime.now()
+        )
+        db.session.add(log)
         db.session.commit()
-        
-        flash('Medication deleted successfully.', 'success')
-        return redirect(url_for('manage_medications'))
+        return jsonify({'message': 'Medication logged successfully.'}), 200
     except Exception as e:
         db.session.rollback()
-        flash('An error occurred while deleting the medication.', 'danger')
+        return jsonify({'message': f'An error occurred: {str(e)}'}), 500
+
+@app.route('/medications/delete/<int:id>', methods=['POST'])
+@login_required
+def delete_medication(id):
+    med = Medication.query.get_or_404(id)
+    if med.user_id != current_user.id:
+        flash('Unauthorized action.', 'danger')
         return redirect(url_for('manage_medications'))
+    try:
+        db.session.delete(med)
+        db.session.commit()
+        flash('Medication deleted successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash(f'An error occurred: {str(e)}', 'danger')
+    return redirect(url_for('manage_medications'))
 
 @app.route('/medications/<int:id>/edit', methods=['GET', 'POST'])
 @login_required
 def edit_medication(id):
-    medication = Medication.query.get_or_404(id)
-    
-    # Verify ownership
-    if medication.user_id != current_user.id:
-        flash('Unauthorized access.', 'danger')
+    med = Medication.query.get_or_404(id)
+    if med.user_id != current_user.id:
+        flash('Unauthorized action.', 'danger')
         return redirect(url_for('manage_medications'))
     
-    form = MedicationForm()
-    
+    form = MedicationForm(obj=med)
     if request.method == 'GET':
-        # Populate form with existing data
-        form.name.data = medication.name
-        form.dosage.data = medication.dosage
-        form.frequency.data = medication.frequency
-        form.time.data = medication.time
+        form.times.entries = []
+        for med_time in med.times:
+            form.times.append_entry({'time': med_time.time.strftime('%H:%M')})
     
     if form.validate_on_submit():
         try:
-            medication.name = form.name.data
-            medication.dosage = form.dosage.data
-            medication.frequency = form.frequency.data
-            medication.time = form.time.data
+            med.name = form.name.data
+            med.dosage = form.dosage.data
+            med.frequency = form.frequency.data
+
+            # Clear existing times
+            MedicationTime.query.filter_by(medication_id=med.id).delete()
+
+            # Add updated times
+            for time_form in form.times.entries:
+                new_time = MedicationTime(
+                    time=time_form.form.time.data,
+                    medication_id=med.id
+                )
+                db.session.add(new_time)
             
             db.session.commit()
-            flash('Medication updated successfully!', 'success')
+            flash('Medication updated successfully.', 'success')
             return redirect(url_for('manage_medications'))
+        except IntegrityError:
+            db.session.rollback()
+            flash('Medication with this name already exists.', 'danger')
         except Exception as e:
             db.session.rollback()
-            flash(f'Error updating medication: {str(e)}', 'danger')
-            
-    return render_template('pages/edit_medication.html', form=form, medication=medication)
+            flash(f'An error occurred: {str(e)}', 'danger')
+    
+    return render_template('pages/edit_medication.html', form=form, medication=med)
+
+@app.route('/medication-schedule')
+@login_required
+def medication_schedule():
+    return render_template('pages/medication-schedule.html')
+
+@app.route('/medications/check-reminders')
+@login_required
+def check_reminders():
+    try:
+        now = datetime.now()
+        current_time = now.time().replace(second=0, microsecond=0)
+        today = now.date()
+
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
+        reminders = []
+
+        for med in medications:
+            for med_time in med.times:
+                if med_time.time.hour == current_time.hour and med_time.time.minute == current_time.minute:
+                    taken = MedicationLog.query.filter_by(
+                        medication_id=med.id,
+                        user_id=current_user.id
+                    ).filter(
+                        db.func.date(MedicationLog.taken_at) == today,
+                        db.func.time(MedicationLog.taken_at) == med_time.time
+                    ).first() is not None
+                    if not taken:
+                        reminders.append({
+                            'name': med.name,
+                            'dosage': med.dosage
+                        })
+
+        return jsonify(reminders), 200
+    except Exception as e:
+        return jsonify({'message': f'An error occurred: {str(e)}'}), 500
 
 
 # Health Logger Routes
@@ -411,106 +517,7 @@ def edit_blood_pressure_record(id):
 
 # Medication Logging Route
 
-@app.route('/medications/log/<int:medication_id>', methods=['POST'])
-@login_required
-def log_medication(medication_id):
-    try:
-        medication = Medication.query.get_or_404(medication_id)
-        if medication.user_id != current_user.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-        
-        # Check if already logged today
-        today = datetime.now().date()
-        existing_log = MedicationLog.query.filter(
-            MedicationLog.medication_id == medication_id,
-            MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
-        ).first()
-        
-        if existing_log:
-            return jsonify({'message': 'Medication already logged today'}), 400
-            
-        # Create new log
-        log = MedicationLog(
-            medication_id=medication_id,
-            user_id=current_user.id,
-            taken_at=datetime.now()
-        )
-        db.session.add(log)
-        db.session.commit()
-        return jsonify({'message': 'Medication logged successfully'})
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
 # Medication Schedule Route
-
-@app.route('/medication-schedule')
-@login_required
-def medication_schedule():
-    try:
-        return render_template('pages/medication-schedule.html')
-    except Exception as e:
-        flash(f'Error loading schedule. Please try again. {e}', 'danger')
-        return redirect(url_for('home'))
-
-@app.route('/medications/daily')
-@login_required
-def get_daily_medications():
-    try:
-        medications = Medication.query.filter_by(user_id=current_user.id).all()
-        medication_list = []
-        
-        for med in medications:
-            medication_list.append({
-                'id': med.id,
-                'name': med.name,
-                'dosage': med.dosage,
-                'time': med.time.strftime('%I:%M %p'),
-                'frequency': med.frequency,
-                'taken': False  # You can implement the taken status logic here
-            })
-        
-        return jsonify(medication_list)
-    except Exception as e:
-        print(f"Error in get_daily_medications: {str(e)}")
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/medications/check-reminders')
-@login_required
-def check_reminders():
-    try:
-        now = datetime.now()
-        current_time = now.time()
-        today = now.date()
-        
-        # Look for medications due in the next 15 minutes
-        upcoming_medications = []
-        medications = Medication.query.filter_by(user_id=current_user.id).all()
-        
-        for med in medications:
-            # Calculate the next dose time
-            med_time = datetime.combine(today, med.time)
-            
-            # Check if medication is due in the next 15 minutes
-            time_diff = (med_time - now).total_seconds() / 60
-            if 0 <= time_diff <= 15:
-                # Check if it hasn't been taken yet today
-                taken = MedicationLog.query.filter(
-                    MedicationLog.medication_id == med.id,
-                    MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
-                ).first() is not None
-                
-                if not taken:
-                    upcoming_medications.append({
-                        'id': med.id,
-                        'name': med.name,
-                        'dosage': med.dosage,
-                        'time': med.time.strftime('%I:%M %p')
-                    })
-        
-        return jsonify(upcoming_medications)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
 
 #----------------------------------------------------------------------------#
 # Authentication Routes
