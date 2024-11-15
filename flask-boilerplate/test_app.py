@@ -63,7 +63,7 @@ class HealthAppTestCase(unittest.TestCase):
         """Test /medications redirect"""
         response = self.client.get('/medications')
         self.assertEqual(response.status_code, 302)
-        self.assertIn('/medication-schedule', response.location)
+        self.assertIn('/medications/manage', response.location)
 
     def test_manage_medications_success(self):
         """Test successful medications management"""
@@ -300,7 +300,7 @@ class HealthAppTestCase(unittest.TestCase):
             
             # Verify redirect to home page
             self.assertEqual(response.status_code, 302)
-            mock_flash.assert_called_with('Error loading schedule. Please try again.', 'danger')
+            mock_flash.assert_called_with('Error loading schedule. Please try again. Template error', 'danger')
 
     def test_get_daily_medications_success(self):
         """Test daily medications retrieval"""
