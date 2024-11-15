@@ -33,7 +33,7 @@ app = Flask(__name__,
             static_folder='static',  # Path to your static folder
             static_url_path='/static'  # URL prefix for static files
            )
-app.config.from_object('config')  # Ensure you have a config.py with necessary configurations
+app.config.from_object('config')
 
 # Initialize the database
 db.init_app(app)
@@ -60,11 +60,11 @@ def load_user(user_id):
 
 @app.route('/')
 def home():
-    return render_template('pages/placeholder.home.html')  # Ensure this template exists
+    return render_template('pages/placeholder.home.html')
 
 @app.route('/about')
 def about():
-    return render_template('pages/about.html')  # Ensure this template exists
+    return render_template('pages/about.html')
 
 # Medication Management Routes
 
@@ -141,17 +141,17 @@ def delete_medication(id):
 @app.route('/health-logger')
 @login_required
 def health_logger():
-    return render_template('pages/health_logger.html')  # Ensure this template exists
+    return render_template('pages/health_logger.html')
 
 @app.route('/health-logger/glucose')
 @login_required
 def glucose_logger():
-    return render_template('pages/glucose_logger.html')  # Ensure this template exists
+    return render_template('pages/glucose_logger.html')
 
 @app.route('/health-logger/blood_pressure')
 @login_required
 def blood_pressure_logger():
-    return render_template('pages/blood_pressure_logger.html')  # Ensure this template exists
+    return render_template('pages/blood_pressure_logger.html')
 
 @app.route('/glucose', methods=['GET', 'POST'])
 @login_required
@@ -176,8 +176,8 @@ def record_glucose():
 
         new_record = GlucoseRecord(
             glucose_level=glucose_level,
-            date=datetime.strptime(date_str, '%Y-%m-%d').date(),
-            time=datetime.strptime(time_str, '%H:%M').time(),
+            date=date_str,
+            time=time_str,
             user_id=current_user.id
         )
 
@@ -221,8 +221,8 @@ def record_blood_pressure():
         new_record = BloodPressureRecord(
             systolic=systolic,
             diastolic=diastolic,
-            date=datetime.strptime(date_str, '%Y-%m-%d').date(),
-            time=datetime.strptime(time_str, '%H:%M').time(),
+            date=date_str,
+            time=time_str,
             user_id=current_user.id
         )
 
@@ -274,7 +274,7 @@ def log_medication(medication_id):
 @login_required
 def medication_schedule():
     try:
-        return render_template('pages/medication_schedule.html')  # Ensure this template exists
+        return render_template('pages/medication_schedule.html')
     except Exception as e:
         flash('Error loading schedule. Please try again.', 'danger')
         return redirect(url_for('home'))
@@ -434,8 +434,8 @@ def export_csv():
         if glucose_records:
             for record in glucose_records:
                 cw.writerow([
-                    record.date.strftime('%Y-%m-%d'),
-                    record.time.strftime('%I:%M %p'),
+                    record.date,
+                    record.time,
                     record.glucose_level
                 ])
         else:
@@ -451,8 +451,8 @@ def export_csv():
         if blood_pressure_records:
             for record in blood_pressure_records:
                 cw.writerow([
-                    record.date.strftime('%Y-%m-%d'),
-                    record.time.strftime('%I:%M %p'),
+                    record.date,
+                    record.time,
                     record.systolic,
                     record.diastolic
                 ])
@@ -490,35 +490,41 @@ def export_csv():
 @login_required
 def export_pdf():
     try:
-        # Create a PDF in memory using ReportLab
         buffer = io.BytesIO()
         p = canvas.Canvas(buffer, pagesize=letter)
         width, height = letter
+
         p.setFont("Helvetica-Bold", 16)
         p.drawString(100, height - 50, f"Health Report for {current_user.username}")
         p.setFont("Helvetica", 12)
         p.drawString(100, height - 80, f"Report Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
 
-        # Fetch Glucose Records
-        glucose_records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(GlucoseRecord.date.desc(), GlucoseRecord.time.desc()).all()
+        y = height - 120
+
+        glucose_records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(
+            GlucoseRecord.date.desc(),
+            GlucoseRecord.time.desc()
+        ).all()
         p.setFont("Helvetica-Bold", 14)
-        p.drawString(100, height - 120, "Glucose Levels:")
+        p.drawString(100, y, "Glucose Levels:")
+        y -= 20
         p.setFont("Helvetica", 12)
-        y = height - 140
         if glucose_records:
             for record in glucose_records:
                 if y < 50:
                     p.showPage()
                     y = height - 50
-                p.drawString(120, y, f"• {record.date.strftime('%Y-%m-%d')} at {record.time.strftime('%I:%M %p')}: {record.glucose_level} mg/dL")
+                p.drawString(120, y, f"• {record.date} at {record.time}: {record.glucose_level} mg/dL")
                 y -= 20
         else:
             p.drawString(120, y, "No glucose records found.")
             y -= 20
 
-        # Fetch Blood Pressure Records
-        y -= 20  # Extra space before next section
-        blood_pressure_records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(BloodPressureRecord.date.desc(), BloodPressureRecord.time.desc()).all()
+        y -= 20 
+        blood_pressure_records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(
+            BloodPressureRecord.date.desc(),
+            BloodPressureRecord.time.desc()
+        ).all()
         p.setFont("Helvetica-Bold", 14)
         p.drawString(100, y, "Blood Pressure Levels:")
         y -= 20
@@ -528,19 +534,18 @@ def export_pdf():
                 if y < 50:
                     p.showPage()
                     y = height - 50
-                p.drawString(120, y, f"• {record.date.strftime('%Y-%m-%d')} at {record.time.strftime('%I:%M %p')}: {record.systolic}/{record.diastolic} mm Hg")
+                p.drawString(120, y, f"• {record.date} at {record.time}: {record.systolic}/{record.diastolic} mm Hg")
                 y -= 20
         else:
             p.drawString(120, y, "No blood pressure records found.")
             y -= 20
 
-        # Summary Section
         y -= 20
         p.setFont("Helvetica-Bold", 14)
         p.drawString(100, y, "Summary:")
         y -= 20
         p.setFont("Helvetica", 12)
-        summary_text = "This report contains your logged health data entries, \nincluding glucose levels and blood pressure readings."
+        summary_text = "This report contains your logged health data entries,\nincluding glucose levels and blood pressure readings."
         text_object = p.beginText(100, y)
         text_object.textLines(summary_text)
         p.drawText(text_object)
@@ -549,7 +554,6 @@ def export_pdf():
         p.save()
         buffer.seek(0)
 
-        # Logging the export action
         app.logger.info(f'PDF report exported for user: {current_user.username}')
 
         return send_file(buffer, as_attachment=True, download_name='health_report.pdf', mimetype='application/pdf')
