@@ -173,7 +173,9 @@ def edit_medication(id):
 
 
 # Health Logger Routes
-
+def is_duplicate_record(model, user_id, date_str, time_str):
+    return model.query.filter_by(user_id=user_id, date=date_str, time=time_str).first() is not None
+   
 @app.route('/health-logger')
 @login_required
 def health_logger():
@@ -209,6 +211,10 @@ def record_glucose():
 
         date_str = request.form['date']
         time_str = request.form['time']
+
+        if is_duplicate_record(GlucoseRecord, current_user.id, date_str, time_str):
+            flash('A glucose record for this date and time already exists.', 'warning')
+            return render_template('pages/glucose_logger.html')
 
         new_record = GlucoseRecord(
             glucose_level=glucose_level,
@@ -253,6 +259,9 @@ def record_blood_pressure():
         date_str = request.form['date']
         time_str = request.form['time']
 
+        if is_duplicate_record(BloodPressureRecord, current_user.id, date_str, time_str):
+            flash('A blood pressure record for this date and time already exists.', 'warning')
+            return render_template('pages/blood_pressure_logger.html')
         # Create a new BloodPressureRecord
         new_record = BloodPressureRecord(
             systolic=systolic,
