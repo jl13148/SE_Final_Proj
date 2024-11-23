@@ -2,6 +2,9 @@
 
 Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplate.git)
 
+## Documentation
+- [User Guide](USER_GUIDE.md) - Detailed instructions for using DiabetesEase
+
 ## Starting the Webpage
 
 1. **Clone the repository**
