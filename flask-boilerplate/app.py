@@ -611,14 +611,20 @@ def manage_connections():
         return redirect(url_for('home'))
     
     # Get pending connections (where all access levels are NONE)
+    # pending_connections = CompanionAccess.query.filter_by(
+    #     patient_id=current_user.id
+    # ).filter(
+    #     db.and_(
+    #         CompanionAccess.medication_access == "NONE",
+    #         CompanionAccess.glucose_access == "NONE",
+    #         CompanionAccess.blood_pressure_access == "NONE"
+    #     )
+    # ).all()
     pending_connections = CompanionAccess.query.filter_by(
-        patient_id=current_user.id
-    ).filter(
-        db.and_(
-            CompanionAccess.medication_access == "NONE",
-            CompanionAccess.glucose_access == "NONE",
-            CompanionAccess.blood_pressure_access == "NONE"
-        )
+        patient_id=current_user.id,
+        medication_access="NONE",
+        glucose_access="NONE",
+        blood_pressure_access="NONE"
     ).all()
     
     # Get active connections (where at least one access level is not NONE)
@@ -636,24 +642,30 @@ def manage_connections():
                          pending_connections=pending_connections,
                          active_connections=active_connections)
 
+
 @app.route('/connections/<int:connection_id>/approve', methods=['POST'])
 @login_required
 def approve_connection(connection_id):
     if current_user.user_type != "PATIENT":
-        return jsonify({'error': 'Unauthorized'}), 403
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('manage_connections'))
         
-    # Set default view access
-    connection.medication_access = "VIEW"
-    connection.glucose_access = "VIEW"
-    connection.blood_pressure_access = "VIEW"
-    
     try:
+        # Set initial access levels to NONE
+        connection.medication_access = "NONE"
+        connection.glucose_access = "NONE"
+        connection.blood_pressure_access = "NONE"
+        connection.export_access = False
+        
         db.session.commit()
-        flash('Connection approved successfully!', 'success')
+        flash(f'Connection approved. Please set access levels for {connection.companion.username}.', 'success')
+        # Redirect to access setting page
+        return redirect(url_for('update_access', connection_id=connection.id))
     except Exception as e:
         db.session.rollback()
         flash('Error approving connection.', 'danger')
@@ -680,16 +692,24 @@ def reject_connection(connection_id):
         
     return redirect(url_for('manage_connections'))
 
-@app.route('/connections/<int:connection_id>/update', methods=['POST'])
+@app.route('/connections/<int:connection_id>/access', methods=['GET', 'POST'])
 @login_required
 def update_access(connection_id):
     if current_user.user_type != "PATIENT":
-        return jsonify({'error': 'Unauthorized'}), 403
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
-        
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('manage_connections'))
+    
+    # Handle GET request - show the form
+    if request.method == 'GET':
+        return render_template('pages/companion_access.html',
+                             access=connection)
+    
+    # Handle POST request - process form submission
     try:
         connection.medication_access = request.form.get('medication_access', 'NONE')
         connection.glucose_access = request.form.get('glucose_access', 'NONE')
@@ -703,6 +723,7 @@ def update_access(connection_id):
         flash('Error updating access levels.', 'danger')
         
     return redirect(url_for('manage_connections'))
+
 
 @app.route('/connections/<int:connection_id>/remove', methods=['POST'])
 @login_required
@@ -834,9 +855,9 @@ def companion_setup():
                 patient_id=patient.id,
                 companion_id=current_user.id,
                 # Default access levels
-                medication_access='view',
-                glucose_access='view',
-                blood_pressure_access='view',
+                medication_access='NONE',
+                glucose_access='NONE',
+                blood_pressure_access='NONE',
                 export_access=False
             )
             
@@ -858,8 +879,27 @@ def companion_patients():
         flash('Access denied.', 'danger')
         return redirect(url_for('home'))
     
-    connections = CompanionAccess.query.filter_by(companion_id=current_user.id).all()
-    return render_template('pages/companion_patients.html', connections=connections)
+    # Get only approved connections (where at least one access is not NONE)
+    connections = CompanionAccess.query.filter(
+        CompanionAccess.companion_id == current_user.id,
+        db.or_(
+            CompanionAccess.medication_access != "NONE",
+            CompanionAccess.glucose_access != "NONE",
+            CompanionAccess.blood_pressure_access != "NONE"
+        )
+    ).all()
+    
+    # Get pending connections
+    pending_connections = CompanionAccess.query.filter_by(
+        companion_id=current_user.id,
+        medication_access="NONE",
+        glucose_access="NONE",
+        blood_pressure_access="NONE"
+    ).all()
+    
+    return render_template('pages/companion_patients.html', 
+                         connections=connections,
+                         pending_connections=pending_connections)
 
 @app.route('/companion/patient/<int:patient_id>')
 @login_required
