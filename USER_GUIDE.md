@@ -130,6 +130,7 @@
 - **Medication Frequency Options**:
   - Once Daily
   - Twice Daily
+  - Three Times Daily
 
 ## Support
 For technical support or questions, please:
