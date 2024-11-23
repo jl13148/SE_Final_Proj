@@ -6,6 +6,8 @@ from flask_login import UserMixin
 from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
+from enum import Enum
+from sqlalchemy import String, Integer, Enum as SQLAlchemyEnum 
 
 db = SQLAlchemy()
 
@@ -32,6 +34,15 @@ class User(Base):
         self.password = password
 '''
 
+class UserType(Enum):
+    PATIENT = "PATIENT"
+    COMPANION = "COMPANION"
+
+class AccessLevel(Enum):
+    NONE = "NONE"
+    VIEW = "VIEW"
+    EDIT = "EDIT"
+
 class User(UserMixin, db.Model):
     __tablename__ = 'users'
 
@@ -39,15 +50,81 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(120), unique=True)
     email = db.Column(db.String(120), unique=True)
     password_hash = db.Column(db.String(255))
+    user_type = db.Column(db.String(20), nullable=False)
     medications = db.relationship('Medication', backref='user', lazy=True)
     glucose_records = db.relationship('GlucoseRecord', backref='user', lazy='dynamic')
     blood_pressure_records = db.relationship('BloodPressureRecord', backref='user', lazy='dynamic')
+
+    # Relationships
+    companions = db.relationship('CompanionAccess', foreign_keys='CompanionAccess.patient_id', backref='patient')
+    patients = db.relationship('CompanionAccess', foreign_keys='CompanionAccess.companion_id', backref='companion')
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def user_type_enum(self):
+        return UserType(self.user_type)
+
+    @user_type_enum.setter
+    def user_type_enum(self, value):
+        if isinstance(value, UserType):
+            self.user_type = value.value
+        else:
+            self.user_type = str(value).upper()
+
+
+class CompanionAccess(db.Model):
+    __tablename__ = 'companion_access'
+    
+    id = db.Column(db.Integer, primary_key=True)
+    patient_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    companion_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    medication_access = db.Column(db.String(20), nullable=False, default='NONE')
+    glucose_access = db.Column(db.String(20), nullable=False, default='NONE')
+    blood_pressure_access = db.Column(db.String(20), nullable=False, default='NONE')
+    export_access = db.Column(db.Boolean, default=False)
+    
+    __table_args__ = (
+        db.UniqueConstraint('patient_id', 'companion_id', name='unique_patient_companion'),
+    )
+
+    @property
+    def medication_access_enum(self):
+        return AccessLevel(self.medication_access)
+
+    @medication_access_enum.setter
+    def medication_access_enum(self, value):
+        if isinstance(value, AccessLevel):
+            self.medication_access = value.value
+        else:
+            self.medication_access = str(value).upper()
+
+    @property
+    def glucose_access_enum(self):
+        return AccessLevel(self.glucose_access)
+
+    @glucose_access_enum.setter
+    def glucose_access_enum(self, value):
+        if isinstance(value, AccessLevel):
+            self.glucose_access = value.value
+        else:
+            self.glucose_access = str(value).upper()
+
+    @property
+    def blood_pressure_access_enum(self):
+        return AccessLevel(self.blood_pressure_access)
+
+    @blood_pressure_access_enum.setter
+    def blood_pressure_access_enum(self, value):
+        if isinstance(value, AccessLevel):
+            self.blood_pressure_access = value.value
+        else:
+            self.blood_pressure_access = str(value).upper()
+
 
 class Medication(db.Model):
     __tablename__ = 'medications'

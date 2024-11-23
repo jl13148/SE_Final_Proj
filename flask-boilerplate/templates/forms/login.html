@@ -1,3 +1,4 @@
+# forms/login.html
 {% extends 'layouts/main.html' %}
 {% block page_title %}Login - DiabetesEase{% endblock %}
 
@@ -19,6 +20,22 @@
                 {% else %}
                     {{ form.email(class="form-control") }}
                 {% endif %}
+            </div>
+            <div class="form-group">
+                {{ form.user_type.label(class="form-label") }}
+                {% if form.user_type.errors %}
+                    {{ form.user_type(class="form-select is-invalid") }}
+                    <div class="invalid-feedback">
+                        {% for error in form.user_type.errors %}
+                            <span>{{ error }}</span>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    {{ form.user_type(class="form-select") }}
+                {% endif %}
+                <div class="form-text">
+                    Select whether you are logging in as a patient or a companion.
+                </div>
             </div>
             <div class="form-group">
                 {{ form.password.label(class="form-label") }}
@@ -76,21 +93,56 @@
 }
 
 .form-group {
-    margin-bottom: 1rem;
+    margin-bottom: 1.5rem;
 }
 
 .invalid-feedback {
     display: block;
 }
 
+.form-control,
+.form-select {
+    padding: 0.75rem 1rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #4a90e2;
+    box-shadow: 0 0 0 0.2rem rgba(74, 144, 226, 0.25);
+}
+
+.form-text {
+    font-size: 0.875rem;
+    color: #6c757d;
+    margin-top: 0.25rem;
+}
+
+.btn-primary {
+    background-color: #4a90e2;
+    border-color: #4a90e2;
+    padding: 0.75rem 1.5rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+    background-color: #357abd;
+    border-color: #357abd;
+    transform: translateY(-1px);
+}
+
 .form-check-input {
     margin-top: 0.3rem;
-    margin-left: -1.25rem;
 }
 
 .form-check-label {
-    margin-bottom: 0;
-    margin-left: 1.25rem;
+    margin-left: 0.5rem;
+}
+
+.alert {
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
 }
 </style>
 {% endblock %}

@@ -1,0 +1,157 @@
+<!-- templates/pages/connections.html -->
+{% extends 'layouts/main.html' %}
+{% block title %}Manage Connections{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    {% if not active_connections %}
+        <!-- Show only if no active connections -->
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card shadow">
+                    <div class="card-body text-center">
+                        <div class="icon-wrapper mb-4">
+                            <i class="fas fa-user-plus fa-3x text-primary"></i>
+                        </div>
+                        <h3>Add Care Companions</h3>
+                        <p class="mb-3">Share your email address with potential companions:</p>
+                        <div class="alert alert-info">
+                            <strong>{{ current_user.email }}</strong>
+                        </div>
+                        <p class="text-muted">They can use this email to connect when they register as a companion.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if pending_connections %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-warning text-white">
+                        <h4 class="mb-0">Pending Connection Requests</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for connection in pending_connections %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title">{{ connection.companion.username }}</h5>
+                                            <p class="card-text">{{ connection.companion.email }}</p>
+                                            <div class="d-flex justify-content-between mt-3">
+                                                <form action="{{ url_for('approve_connection', connection_id=connection.id) }}" 
+                                                      method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-success">Accept</button>
+                                                </form>
+                                                <form action="{{ url_for('reject_connection', connection_id=connection.id) }}" 
+                                                      method="POST" class="d-inline">
+                                                    <button type="submit" class="btn btn-danger">Decline</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if active_connections %}
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card shadow">
+                    <div class="card-header bg-primary text-white">
+                        <h4 class="mb-0">Active Connections</h4>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            {% for connection in active_connections %}
+                                <div class="col-md-6 mb-3">
+                                    <div class="card">
+                                        <div class="card-body">
+                                            <h5 class="card-title d-flex justify-content-between">
+                                                {{ connection.companion.username }}
+                                                <button type="button" class="btn btn-sm btn-outline-danger"
+                                                        onclick="if(confirm('Remove this companion?')) document.getElementById('remove-form-{{ connection.id }}').submit()">
+                                                    <i class="fas fa-times"></i>
+                                                </button>
+                                            </h5>
+                                            <p class="text-muted">{{ connection.companion.email }}</p>
+                                            
+                                            <form action="{{ url_for('update_access', connection_id=connection.id) }}" 
+                                                  method="POST">
+                                                <div class="form-group">
+                                                    <label>Medication Records</label>
+                                                    <select name="medication_access" class="form-control">
+                                                        <option value="NONE" {% if connection.medication_access == 'NONE' %}selected{% endif %}>No Access</option>
+                                                        <option value="VIEW" {% if connection.medication_access == 'VIEW' %}selected{% endif %}>View Only</option>
+                                                        <option value="EDIT" {% if connection.medication_access == 'EDIT' %}selected{% endif %}>Full Access</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="form-group">
+                                                    <label>Glucose Records</label>
+                                                    <select name="glucose_access" class="form-control">
+                                                        <option value="NONE" {% if connection.glucose_access == 'NONE' %}selected{% endif %}>No Access</option>
+                                                        <option value="VIEW" {% if connection.glucose_access == 'VIEW' %}selected{% endif %}>View Only</option>
+                                                        <option value="EDIT" {% if connection.glucose_access == 'EDIT' %}selected{% endif %}>Full Access</option>
+                                                    </select>
+                                                </div>
+                                                
+                                                <div class="form-group">
+                                                    <label>Blood Pressure Records</label>
+                                                    <select name="blood_pressure_access" class="form-control">
+                                                        <option value="NONE" {% if connection.blood_pressure_access == 'NONE' %}selected{% endif %}>No Access</option>
+                                                        <option value="VIEW" {% if connection.blood_pressure_access == 'VIEW' %}selected{% endif %}>View Only</option>
+                                                        <option value="EDIT" {% if connection.blood_pressure_access == 'EDIT' %}selected{% endif %}>Full Access</option>
+                                                    </select>
+                                                </div>
+
+                                                <button type="submit" class="btn btn-primary">Update Access</button>
+                                            </form>
+
+                                            <form id="remove-form-{{ connection.id }}" 
+                                                  action="{{ url_for('remove_connection', connection_id=connection.id) }}" 
+                                                  method="POST" class="d-none">
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.nav-tabs .nav-link {
+    color: #495057;
+}
+
+.nav-tabs .nav-link.active {
+    font-weight: bold;
+}
+
+.badge {
+    margin-left: 5px;
+}
+</style>
+{% endblock %}

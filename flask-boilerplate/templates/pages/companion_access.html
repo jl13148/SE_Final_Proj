@@ -1,0 +1,55 @@
+# pages/companion_access.html
+{% extends 'layouts/main.html' %}
+{% block title %}Manage Companion Access{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Manage Access for {{ access.companion.username }}</h4>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ category }}">{{ message }}</div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+                    
+                    <form method="POST">
+                        {{ form.hidden_tag() }}
+                        
+                        <div class="form-group mb-3">
+                            {{ form.medication_access.label(class="form-label") }}
+                            {{ form.medication_access(class="form-select") }}
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.glucose_access.label(class="form-label") }}
+                            {{ form.glucose_access(class="form-select") }}
+                        </div>
+                        
+                        <div class="form-group mb-3">
+                            {{ form.blood_pressure_access.label(class="form-label") }}
+                            {{ form.blood_pressure_access(class="form-select") }}
+                        </div>
+                        
+                        <div class="form-check mb-3">
+                            {{ form.export_access(class="form-check-input") }}
+                            {{ form.export_access.label(class="form-check-label") }}
+                        </div>
+                        
+                        <div class="d-grid gap-2">
+                            {{ form.submit(class="btn btn-primary") }}
+                            <a href="{{ url_for('manage_companions') }}" class="btn btn-secondary">Back to Companions</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

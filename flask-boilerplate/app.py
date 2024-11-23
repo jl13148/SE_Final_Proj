@@ -8,9 +8,10 @@ from flask_sqlalchemy import SQLAlchemy
 import logging
 from django.db import IntegrityError
 from logging import Formatter, FileHandler
-from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm
-from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog
+from forms import ExportPDFForm, ExportCSVForm, LoginForm, RegisterForm, ForgotForm, MedicationForm, CompanionLinkForm
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog, UserType, AccessLevel, CompanionAccess
 from datetime import datetime
+from functools import wraps
 import io
 import csv
 import os
@@ -47,6 +48,43 @@ login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'  # Redirect to 'login' route if not authenticated
 
+
+#----------------------------------------------------------------------------#
+# Decorators
+#----------------------------------------------------------------------------#
+
+def check_companion_access(access_type):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            if current_user.user_type == UserType.COMPANION:
+                patient_id = kwargs.get('patient_id')
+                if not patient_id:
+                    flash('Patient not specified.', 'danger')
+                    return redirect(url_for('home'))
+                
+                access = CompanionAccess.query.filter_by(
+                    patient_id=patient_id,
+                    companion_id=current_user.id
+                ).first()
+                
+                if not access:
+                    flash('No access to this patient\'s data.', 'danger')
+                    return redirect(url_for('home'))
+                
+                access_level = getattr(access, f"{access_type}_access")
+                if access_level == AccessLevel.NONE:
+                    flash('You don\'t have access to this feature.', 'danger')
+                    return redirect(url_for('home'))
+                
+                if access_level == AccessLevel.VIEW and request.method != 'GET':
+                    flash('You only have view access to this feature.', 'danger')
+                    return redirect(url_for('home'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
 #----------------------------------------------------------------------------#
 # User Loader for Flask-Login
 #----------------------------------------------------------------------------#
@@ -67,113 +105,10 @@ def home():
 def about():
     return render_template('pages/about.html')
 
-# Medication Management Routes
-
-@app.route('/medications')
-@login_required
-def medications():
-    return redirect(url_for('manage_medications'))
-
-@app.route('/medications/manage')
-@login_required
-def manage_medications():
-    try:
-        medications = Medication.query.filter_by(user_id=current_user.id).all()
-        return render_template('pages/medications.html', 
-                               medications=medications,
-                               is_personal=True)
-    except Exception as e:
-        flash('Error loading medications. Please try again.', 'danger')
-        return redirect(url_for('home'))
-
-@app.route('/medications/add', methods=['GET', 'POST'])
-@login_required
-def add_medication():
-    form = MedicationForm()
-    if form.validate_on_submit():
-        try:
-            # Create new medication with the form data
-            medication = Medication(
-                name=form.name.data,
-                dosage=form.dosage.data,
-                frequency=form.frequency.data,
-                time=form.time.data,
-                user_id=current_user.id
-            )
-            
-            db.session.add(medication)
-            db.session.commit()
-            
-            flash('Medication added successfully!', 'success')
-            return redirect(url_for('manage_medications'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error adding medication: {str(e)}', 'danger')
-            return redirect(url_for('add_medication'))
-    
-    return render_template('pages/add_medication.html', form=form)
-
-@app.route('/medications/<int:id>/delete', methods=['POST'])
-@login_required
-def delete_medication(id):
-    try:
-        medication = Medication.query.get_or_404(id)
-        # Check if the medication belongs to the current user
-        if medication.user_id != current_user.id:
-            flash('Unauthorized action.', 'danger')
-            return redirect(url_for('medications'))
-            
-        # Delete associated logs first
-        MedicationLog.query.filter_by(medication_id=id).delete()
-        
-        # Delete the medication
-        db.session.delete(medication)
-        db.session.commit()
-        
-        flash('Medication deleted successfully.', 'success')
-        return redirect(url_for('manage_medications'))
-    except Exception as e:
-        db.session.rollback()
-        flash('An error occurred while deleting the medication.', 'danger')
-        return redirect(url_for('manage_medications'))
-
-@app.route('/medications/<int:id>/edit', methods=['GET', 'POST'])
-@login_required
-def edit_medication(id):
-    medication = Medication.query.get_or_404(id)
-    
-    # Verify ownership
-    if medication.user_id != current_user.id:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('manage_medications'))
-    
-    form = MedicationForm()
-    
-    if request.method == 'GET':
-        # Populate form with existing data
-        form.name.data = medication.name
-        form.dosage.data = medication.dosage
-        form.frequency.data = medication.frequency
-        form.time.data = medication.time
-    
-    if form.validate_on_submit():
-        try:
-            medication.name = form.name.data
-            medication.dosage = form.dosage.data
-            medication.frequency = form.frequency.data
-            medication.time = form.time.data
-            
-            db.session.commit()
-            flash('Medication updated successfully!', 'success')
-            return redirect(url_for('manage_medications'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating medication: {str(e)}', 'danger')
-            
-    return render_template('pages/edit_medication.html', form=form, medication=medication)
-
-
+#----------------------------------------------------------------------------#
 # Health Logger Routes
+#----------------------------------------------------------------------------#
+
 def is_duplicate_record(model, user_id, date_str, time_str):
     return model.query.filter_by(user_id=user_id, date=date_str, time=time_str).first() is not None
    
@@ -182,13 +117,15 @@ def is_duplicate_record(model, user_id, date_str, time_str):
 def health_logger():
     return render_template('pages/health_logger.html')
 
-@app.route('/health-logger/glucose')
+@app.route('/health-logger/glucose/')
 @login_required
+# @check_companion_access('glucose')
 def glucose_logger():
     return render_template('pages/glucose_logger.html')
 
 @app.route('/health-logger/blood_pressure')
 @login_required
+@check_companion_access('blood_pressure')
 def blood_pressure_logger():
     return render_template('pages/blood_pressure_logger.html')
 
@@ -409,7 +346,118 @@ def edit_blood_pressure_record(id):
 
     return render_template('pages/edit_blood_pressure_record.html', record=record)
 
+
+#----------------------------------------------------------------------------#
+# Medication Management Routes
+#----------------------------------------------------------------------------#
+
+@app.route('/medications')
+@login_required
+@check_companion_access('medication')
+def medications():
+    return redirect(url_for('manage_medications'))
+
+@app.route('/medications/manage')
+@login_required
+def manage_medications():
+    try:
+        medications = Medication.query.filter_by(user_id=current_user.id).all()
+        return render_template('pages/medications.html', 
+                               medications=medications,
+                               is_personal=True)
+    except Exception as e:
+        flash('Error loading medications. Please try again.', 'danger')
+        return redirect(url_for('home'))
+
+@app.route('/medications/add', methods=['GET', 'POST'])
+@login_required
+def add_medication():
+    form = MedicationForm()
+    if form.validate_on_submit():
+        try:
+            # Create new medication with the form data
+            medication = Medication(
+                name=form.name.data,
+                dosage=form.dosage.data,
+                frequency=form.frequency.data,
+                time=form.time.data,
+                user_id=current_user.id
+            )
+            
+            db.session.add(medication)
+            db.session.commit()
+            
+            flash('Medication added successfully!', 'success')
+            return redirect(url_for('manage_medications'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error adding medication: {str(e)}', 'danger')
+            return redirect(url_for('add_medication'))
+    
+    return render_template('pages/add_medication.html', form=form)
+
+@app.route('/medications/<int:id>/delete', methods=['POST'])
+@login_required
+def delete_medication(id):
+    try:
+        medication = Medication.query.get_or_404(id)
+        # Check if the medication belongs to the current user
+        if medication.user_id != current_user.id:
+            flash('Unauthorized action.', 'danger')
+            return redirect(url_for('medications'))
+            
+        # Delete associated logs first
+        MedicationLog.query.filter_by(medication_id=id).delete()
+        
+        # Delete the medication
+        db.session.delete(medication)
+        db.session.commit()
+        
+        flash('Medication deleted successfully.', 'success')
+        return redirect(url_for('manage_medications'))
+    except Exception as e:
+        db.session.rollback()
+        flash('An error occurred while deleting the medication.', 'danger')
+        return redirect(url_for('manage_medications'))
+
+@app.route('/medications/<int:id>/edit', methods=['GET', 'POST'])
+@login_required
+def edit_medication(id):
+    medication = Medication.query.get_or_404(id)
+    
+    # Verify ownership
+    if medication.user_id != current_user.id:
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('manage_medications'))
+    
+    form = MedicationForm()
+    
+    if request.method == 'GET':
+        # Populate form with existing data
+        form.name.data = medication.name
+        form.dosage.data = medication.dosage
+        form.frequency.data = medication.frequency
+        form.time.data = medication.time
+    
+    if form.validate_on_submit():
+        try:
+            medication.name = form.name.data
+            medication.dosage = form.dosage.data
+            medication.frequency = form.frequency.data
+            medication.time = form.time.data
+            
+            db.session.commit()
+            flash('Medication updated successfully!', 'success')
+            return redirect(url_for('manage_medications'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating medication: {str(e)}', 'danger')
+            
+    return render_template('pages/edit_medication.html', form=form, medication=medication)
+
+#----------------------------------------------------------------------------#
 # Medication Logging Route
+#----------------------------------------------------------------------------#
 
 @app.route('/medications/log/<int:medication_id>', methods=['POST'])
 @login_required
@@ -442,7 +490,9 @@ def log_medication(medication_id):
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
+#----------------------------------------------------------------------------#
 # Medication Schedule Route
+#----------------------------------------------------------------------------#
 
 @app.route('/medication-schedule')
 @login_required
@@ -513,8 +563,213 @@ def check_reminders():
         return jsonify({'error': str(e)}), 500
 
 #----------------------------------------------------------------------------#
+# Manage companion
+#----------------------------------------------------------------------------#
+
+@app.route('/companions')
+@login_required
+def manage_companions():
+    if current_user.user_type != 'PATIENT':
+        flash('Only patients can manage companions.', 'warning')
+        return redirect(url_for('home'))
+        
+    pending_companions = CompanionAccess.query.filter_by(
+        patient_id=current_user.id,
+        medication_access='none',
+        glucose_access='none',
+        blood_pressure_access='none'
+    ).all()
+    
+    active_companions = CompanionAccess.query.filter(
+        CompanionAccess.patient_id == current_user.id,
+        db.or_(
+            CompanionAccess.medication_access != 'none',
+            CompanionAccess.glucose_access != 'none',
+            CompanionAccess.blood_pressure_access != 'none'
+        )
+    ).all()
+    
+    return render_template('pages/manage_companions.html',
+                         pending_companions=pending_companions,
+                         active_companions=active_companions)
+
+@app.route('/companions/<int:companion_id>/remove', methods=['POST'])
+@login_required
+def remove_companion(companion_id):
+    if current_user.user_type != "PATIENT":
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('home'))
+        
+    access = CompanionAccess.query.filter_by(
+        patient_id=current_user.id,
+        companion_id=companion_id
+    ).first_or_404()
+    
+    try:
+        db.session.delete(access)
+        db.session.commit()
+        flash('Companion removed successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error removing companion.', 'danger')
+        
+    return redirect(url_for('manage_companions'))
+
+#----------------------------------------------------------------------------#
+# Manage connection access
+#----------------------------------------------------------------------------#
+
+@app.route('/connections')
+@login_required
+def manage_connections():
+    if current_user.user_type != "PATIENT":
+    # if not current_user.is_patient():
+        flash('Only patients can manage connections.', 'danger')
+        return redirect(url_for('home'))
+    
+    # Get pending connections (where all access levels are NONE)
+    pending_connections = CompanionAccess.query.filter_by(
+        patient_id=current_user.id
+    ).filter(
+        db.and_(
+            CompanionAccess.medication_access == "NONE",
+            CompanionAccess.glucose_access == "NONE",
+            CompanionAccess.blood_pressure_access == "NONE"
+        )
+    ).all()
+    
+    # Get active connections (where at least one access level is not NONE)
+    active_connections = CompanionAccess.query.filter_by(
+        patient_id=current_user.id
+    ).filter(
+        db.or_(
+            CompanionAccess.medication_access != "NONE",
+            CompanionAccess.glucose_access != "NONE",
+            CompanionAccess.blood_pressure_access != "NONE"
+        )
+    ).all()
+    
+    return render_template('pages/connections.html',
+                         pending_connections=pending_connections,
+                         active_connections=active_connections)
+
+@app.route('/connections/<int:connection_id>/approve', methods=['POST'])
+@login_required
+def approve_connection(connection_id):
+    if current_user.user_type != "PATIENT":
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    connection = CompanionAccess.query.get_or_404(connection_id)
+    if connection.patient_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    # Set default view access
+    connection.medication_access = "VIEW"
+    connection.glucose_access = "VIEW"
+    connection.blood_pressure_access = "VIEW"
+    
+    try:
+        db.session.commit()
+        flash('Connection approved successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error approving connection.', 'danger')
+        
+    return redirect(url_for('manage_connections'))
+
+@app.route('/connections/<int:connection_id>/reject', methods=['POST'])
+@login_required
+def reject_connection(connection_id):
+    if current_user.user_type != "PATIENT":
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    connection = CompanionAccess.query.get_or_404(connection_id)
+    if connection.patient_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    try:
+        db.session.delete(connection)
+        db.session.commit()
+        flash('Connection rejected.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error rejecting connection.', 'danger')
+        
+    return redirect(url_for('manage_connections'))
+
+@app.route('/connections/<int:connection_id>/update', methods=['POST'])
+@login_required
+def update_access(connection_id):
+    if current_user.user_type != "PATIENT":
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    connection = CompanionAccess.query.get_or_404(connection_id)
+    if connection.patient_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    try:
+        connection.medication_access = request.form.get('medication_access', 'NONE')
+        connection.glucose_access = request.form.get('glucose_access', 'NONE')
+        connection.blood_pressure_access = request.form.get('blood_pressure_access', 'NONE')
+        connection.export_access = 'export_access' in request.form
+        
+        db.session.commit()
+        flash('Access levels updated successfully!', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error updating access levels.', 'danger')
+        
+    return redirect(url_for('manage_connections'))
+
+@app.route('/connections/<int:connection_id>/remove', methods=['POST'])
+@login_required
+def remove_connection(connection_id):
+    if current_user.user_type != "PATIENT":
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    connection = CompanionAccess.query.get_or_404(connection_id)
+    if connection.patient_id != current_user.id:
+        return jsonify({'error': 'Unauthorized'}), 403
+        
+    try:
+        db.session.delete(connection)
+        db.session.commit()
+        flash('Connection removed successfully.', 'success')
+    except Exception as e:
+        db.session.rollback()
+        flash('Error removing connection.', 'danger')
+        
+    return redirect(url_for('manage_connections'))
+
+@app.context_processor
+def utility_processor():
+    def get_pending_connections_count():
+        if not current_user.is_authenticated or current_user.user_type != "PATIENT":
+            return 0
+        return CompanionAccess.query.filter_by(
+            patient_id=current_user.id
+        ).filter(
+            db.and_(
+                CompanionAccess.medication_access == "NONE",
+                CompanionAccess.glucose_access == "NONE",
+                CompanionAccess.blood_pressure_access == "NONE"
+            )
+        ).count()
+    
+    return dict(pending_connections_count=get_pending_connections_count())
+
+#----------------------------------------------------------------------------#
 # Authentication Routes
 #----------------------------------------------------------------------------#
+
+@app.context_processor
+def inject_debug_info():
+    def get_user_type():
+        if current_user.is_authenticated:
+            return f"{current_user.user_type} (type: {type(current_user.user_type)})"
+        return "Not authenticated"
+    return dict(debug_user_type=get_user_type())
+    
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -523,14 +778,21 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data).first()
+        user = User.query.filter_by(email=form.email.data, user_type=form.user_type.data).first()
+        
         if user and user.check_password(form.password.data):
             login_user(user, remember=form.remember.data)
             next_page = request.args.get('next')
+            
+            if user.user_type == 'companion':
+                # Check if companion has any linked patients
+                if not user.patients:
+                    return redirect(url_for('companion_setup'))
+                    
             flash('Login successful!', 'success')
             return redirect(next_page) if next_page else redirect(url_for('home'))
         else:
-            flash('Login unsuccessful. Please check email and password.', 'danger')
+            flash('Login unsuccessful. Please check email, password and account type.', 'danger')
     return render_template('forms/login.html', form=form)
 
 @app.route('/register', methods=['GET', 'POST'])
@@ -542,21 +804,88 @@ def register():
     if form.validate_on_submit():
         user = User(
             username=form.username.data,
-            email=form.email.data
+            email=form.email.data,
+            user_type=form.user_type.data
         )
         user.set_password(form.password.data)
         
         try:
             db.session.add(user)
             db.session.commit()
+            
             flash('Your account has been created! You can now log in.', 'success')
+            if form.user_type.data == 'COMPANION':
+                # Redirect companions to a page where they can link with patients
+                login_user(user)
+                return redirect(url_for('companion_setup'))
             return redirect(url_for('login'))
+            
         except Exception as e:
             db.session.rollback()
             flash('An error occurred. Please try again.', 'danger')
             return render_template('forms/register.html', form=form)
             
     return render_template('forms/register.html', form=form)
+
+
+@app.route('/companion/setup', methods=['GET', 'POST'])
+@login_required
+def companion_setup():
+    if current_user.user_type != 'COMPANION':
+        return redirect(url_for('home'))
+        
+    form = CompanionLinkForm()
+    if form.validate_on_submit():
+        patient = User.query.filter_by(email=form.patient_email.data, user_type='PATIENT').first()
+        
+        # Check if already linked
+        existing_link = CompanionAccess.query.filter_by(
+            patient_id=patient.id,
+            companion_id=current_user.id
+        ).first()
+        
+        if existing_link:
+            flash('You are already linked with this patient.', 'warning')
+        else:
+            link = CompanionAccess(
+                patient_id=patient.id,
+                companion_id=current_user.id,
+                # Default access levels
+                medication_access='view',
+                glucose_access='view',
+                blood_pressure_access='view',
+                export_access=False
+            )
+            
+            try:
+                db.session.add(link)
+                db.session.commit()
+                flash('Successfully linked with patient. Waiting for access approval.', 'success')
+                return redirect(url_for('home'))
+            except Exception as e:
+                db.session.rollback()
+                flash('An error occurred while linking with patient.', 'danger')
+                
+    return render_template('pages/companion_setup.html', form=form)
+
+@app.route('/patient/<int:patient_id>')
+@login_required
+def view_patient_data(patient_id):
+    if current_user.user_type != "COMPANION":
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('home'))
+        
+    access = CompanionAccess.query.filter_by(
+        patient_id=patient_id,
+        companion_id=current_user.id
+    ).first_or_404()
+    
+    patient = User.query.get_or_404(patient_id)
+    
+    return render_template('pages/patient_data.html', 
+                         patient=patient,
+                         access=access)
+
 
 @app.route('/logout')
 def logout():
@@ -593,6 +922,7 @@ def health_reports():
 #----------------------------------------------------------------------------#
 # CSV Exportation Functionality
 #----------------------------------------------------------------------------#
+
 @app.route('/export/csv', methods=['POST'])
 @login_required
 def export_csv():
@@ -654,7 +984,6 @@ def export_csv():
         app.logger.error(f'Error exporting CSV: {e}')
         flash(f'Error exporting CSV: {str(e)}', 'danger')
         return redirect(url_for('health_reports'))
-
 
 
 #----------------------------------------------------------------------------#
@@ -760,6 +1089,18 @@ def internal_error(error):
 def not_found_error(error):
     return render_template('errors/404.html'), 404
 
+@app.errorhandler(403)
+def forbidden(e):
+    print("403 error occurred")
+    return render_template('errors/403.html'), 403
+
+# @app.before_request
+# def before_request():
+#     print(f"Request path: {request.path}")
+#     print(f"User authenticated: {current_user.is_authenticated}")
+#     if current_user.is_authenticated:
+#         print(f"User type: {current_user.user_type}")
+
 #----------------------------------------------------------------------------#
 # Logging Configuration
 #----------------------------------------------------------------------------#
@@ -843,7 +1184,17 @@ def delete_blood_pressure_record(id):
 # Launch.
 #----------------------------------------------------------------------------#
 
+# if __name__ == '__main__':
+#     with app.app_context():
+#         db.create_all()  # This will create all tables if they don't exist
+#     app.run(debug=True)  # Set debug=False in production
+
 if __name__ == '__main__':
     with app.app_context():
-        db.create_all()  # This will create all tables if they don't exist
-    app.run(debug=True)  # Set debug=False in production
+        # Update existing user types to lowercase
+        users = User.query.all()
+        for user in users:
+            user.user_type = user.user_type.lower()
+        db.session.commit()
+        print("Updated all user types to lowercase")
+    app.run(debug=True)
