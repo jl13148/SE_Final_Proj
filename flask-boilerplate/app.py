@@ -563,59 +563,6 @@ def check_reminders():
         return jsonify({'error': str(e)}), 500
 
 #----------------------------------------------------------------------------#
-# Manage companion
-#----------------------------------------------------------------------------#
-
-@app.route('/companions')
-@login_required
-def manage_companions():
-    if current_user.user_type != 'PATIENT':
-        flash('Only patients can manage companions.', 'warning')
-        return redirect(url_for('home'))
-        
-    pending_companions = CompanionAccess.query.filter_by(
-        patient_id=current_user.id,
-        medication_access='none',
-        glucose_access='none',
-        blood_pressure_access='none'
-    ).all()
-    
-    active_companions = CompanionAccess.query.filter(
-        CompanionAccess.patient_id == current_user.id,
-        db.or_(
-            CompanionAccess.medication_access != 'none',
-            CompanionAccess.glucose_access != 'none',
-            CompanionAccess.blood_pressure_access != 'none'
-        )
-    ).all()
-    
-    return render_template('pages/manage_companions.html',
-                         pending_companions=pending_companions,
-                         active_companions=active_companions)
-
-@app.route('/companions/<int:companion_id>/remove', methods=['POST'])
-@login_required
-def remove_companion(companion_id):
-    if current_user.user_type != "PATIENT":
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('home'))
-        
-    access = CompanionAccess.query.filter_by(
-        patient_id=current_user.id,
-        companion_id=companion_id
-    ).first_or_404()
-    
-    try:
-        db.session.delete(access)
-        db.session.commit()
-        flash('Companion removed successfully.', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash('Error removing companion.', 'danger')
-        
-    return redirect(url_for('manage_companions'))
-
-#----------------------------------------------------------------------------#
 # Manage connection access
 #----------------------------------------------------------------------------#
 
