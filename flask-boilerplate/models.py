@@ -7,9 +7,17 @@ from datetime import datetime
 from werkzeug.security import generate_password_hash, check_password_hash
 from flask_sqlalchemy import SQLAlchemy
 from enum import Enum
+from sqlalchemy import event
+from sqlalchemy.engine import Engine
 from sqlalchemy import String, Integer, Enum as SQLAlchemyEnum 
 
 db = SQLAlchemy()
+
+@event.listens_for(Engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
 
 # engine = create_engine('sqlite:///database.db', echo=True)
 # db_session = scoped_session(sessionmaker(autocommit=False,
