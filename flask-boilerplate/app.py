@@ -1179,12 +1179,39 @@ def reset_db():
         db.create_all()
         print('Database has been reset!')
 
-@app.cli.command("init_db")
 def init_db():
-    """Initialize the database."""
+    """Initialize database and check schema"""
     with app.app_context():
-        db.create_all()
-        print('Database initialized!')
+        try:
+            # Verify database connection
+            db.engine.connect()
+            
+            # Check if tables exist
+            inspector = db.inspect(db.engine)
+            existing_tables = inspector.get_table_names()
+            
+            if not existing_tables:
+                print("No tables found. Creating database schema...")
+                db.create_all()
+                print("Database schema created successfully!")
+            else:
+                print(f"Found existing tables: {existing_tables}")
+                
+                # Verify each model's table exists
+                models = [User, Medication, GlucoseRecord, BloodPressureRecord, 
+                         MedicationLog, CompanionAccess]
+                
+                for model in models:
+                    if model.__tablename__ not in existing_tables:
+                        print(f"Creating missing table: {model.__tablename__}")
+                        model.__table__.create(db.engine)
+            
+            return True
+            
+        except Exception as e:
+            print(f"Database initialization error: {e}")
+            return False
+
 
 #----------------------------------------------------------------------------#
 # View Routes for Records
@@ -1237,12 +1264,18 @@ def delete_blood_pressure_record(id):
 #         db.create_all()  # This will create all tables if they don't exist
 #     app.run(debug=True)  # Set debug=False in production
 
+# if __name__ == '__main__':
+#     with app.app_context():
+#         # Update existing user types to lowercase
+#         users = User.query.all()
+#         for user in users:
+#             user.user_type = user.user_type.lower()
+#         db.session.commit()
+#         print("Updated all user types to lowercase")
+#     app.run(debug=True)
+
 if __name__ == '__main__':
-    with app.app_context():
-        # Update existing user types to lowercase
-        users = User.query.all()
-        for user in users:
-            user.user_type = user.user_type.lower()
-        db.session.commit()
-        print("Updated all user types to lowercase")
-    app.run(debug=True)
+    if init_db():
+        app.run(debug=True)
+    else:
+        print("Error initializing database. Please check configuration.")

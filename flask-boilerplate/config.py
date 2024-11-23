@@ -13,7 +13,7 @@ SECRET_KEY = 'my precious'
 
 # Connect to the database
 SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'database.db')
-
+SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 # Static files configuration
 STATIC_FOLDER = 'static'
