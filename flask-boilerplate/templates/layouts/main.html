@@ -20,6 +20,13 @@
 <body>
 
     <!-- Navigation -->
+    {% if current_user.is_authenticated %}
+        <div class="debug-info" style="display: none;">
+            <p>User Type: {{ current_user.user_type }}</p>
+            <p>Is Companion Check: {{ current_user.user_type == "COMPANION" }}</p>
+            <p>Raw Type: {{ current_user.user_type.__str__() }}</p>
+        </div>
+    {% endif %}
     <nav class="navbar navbar-expand-lg navbar-light bg-light">
         <div class="container">
             <a class="navbar-brand" href="{{ url_for('home') }}">DiabetesEase</a>
@@ -56,6 +63,11 @@
                                         <span class="badge badge-danger">{{ pending_connections_count }}</span>
                                     {% endif %}
                                 </a>
+                            </li>
+                        {% endif %}
+                        {% if current_user.user_type == "COMPANION" %}
+                            <li class="nav-item">
+                                <a class="nav-link" href="{{ url_for('companion_patients') }}">My Patients</a>
                             </li>
                         {% endif %}
                     {% endif %}

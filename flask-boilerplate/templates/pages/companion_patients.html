@@ -1,0 +1,65 @@
+{% extends 'layouts/main.html' %}
+{% block title %}My Patients{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <h2 class="mb-4">My Patients</h2>
+    
+    {% if connections %}
+        <div class="row">
+            {% for connection in connections %}
+                <div class="col-md-6 mb-4">
+                    <div class="card shadow-sm">
+                        <div class="card-body">
+                            <h5 class="card-title">{{ connection.patient.username }}</h5>
+                            <p class="text-muted">{{ connection.patient.email }}</p>
+                            
+                            <div class="mb-3">
+                                <h6>Access Levels:</h6>
+                                <div class="list-group">
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        Medications
+                                        <span class="badge {% if connection.medication_access == 'EDIT' %}bg-success{% elif connection.medication_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %}">
+                                            {{ connection.medication_access }}
+                                        </span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        Glucose Records
+                                        <span class="badge {% if connection.glucose_access == 'EDIT' %}bg-success{% elif connection.glucose_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %}">
+                                            {{ connection.glucose_access }}
+                                        </span>
+                                    </div>
+                                    <div class="list-group-item d-flex justify-content-between align-items-center">
+                                        Blood Pressure Records
+                                        <span class="badge {% if connection.blood_pressure_access == 'EDIT' %}bg-success{% elif connection.blood_pressure_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %}">
+                                            {{ connection.blood_pressure_access }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {% if connection.medication_access != "NONE" or 
+                                  connection.glucose_access != "NONE" or 
+                                  connection.blood_pressure_access != "NONE" %}
+                                <a href="{{ url_for('view_patient_data', patient_id=connection.patient.id) }}" 
+                                   class="btn btn-primary w-100">View Patient Data</a>
+                            {% else %}
+                                <div class="alert alert-info mb-0">
+                                    Waiting for access approval
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <h4 class="alert-heading">No Connected Patients</h4>
+            <p>You haven't been connected with any patients yet. Share your email address with patients who want to add you as a companion:</p>
+            <hr>
+            <p class="mb-0"><strong>{{ current_user.email }}</strong></p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

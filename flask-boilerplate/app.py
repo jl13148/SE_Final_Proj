@@ -218,18 +218,29 @@ def record_blood_pressure():
 
     return render_template('pages/blood_pressure_logger.html')
 
+
 @app.route('/glucose/edit/<int:id>', methods=['GET', 'POST'])
 @login_required
 def edit_glucose_record(id):
     """
     Edit an existing glucose record.
-
-    :param id: ID of the glucose record to edit.
     """
     record = GlucoseRecord.query.get_or_404(id)
 
-    # Verify ownership
-    if record.user_id != current_user.id:
+    # Check permissions (either owner or authorized companion)
+    has_permission = False
+    if record.user_id == current_user.id:
+        has_permission = True
+    elif current_user.user_type == "COMPANION":
+        # Check companion access
+        access = CompanionAccess.query.filter_by(
+            patient_id=record.user_id,
+            companion_id=current_user.id,
+        ).first()
+        if access and access.glucose_access == "EDIT":
+            has_permission = True
+
+    if not has_permission:
         flash("You do not have permission to edit this record.", 'danger')
         return redirect(url_for('glucose_logger'))
 
@@ -241,8 +252,8 @@ def edit_glucose_record(id):
             return render_template('pages/edit_glucose_record.html', record=record)
         
         # Validate glucose level boundaries
-        MIN_GLUCOSE = 70    # Minimum acceptable glucose level in mg/dL
-        MAX_GLUCOSE = 180   # Maximum acceptable glucose level in mg/dL
+        MIN_GLUCOSE = 70
+        MAX_GLUCOSE = 180
 
         if not (MIN_GLUCOSE <= new_glucose_level <= MAX_GLUCOSE):
             flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
@@ -251,8 +262,8 @@ def edit_glucose_record(id):
         date_str = request.form['date']
         time_str = request.form['time']
 
-        # Check for duplicate record only if date or time has changed
-        if (date_str != record.date or time_str != record.time) and is_duplicate_record(GlucoseRecord, current_user.id, date_str, time_str):
+        # Check for duplicate record
+        if (date_str != record.date or time_str != record.time) and is_duplicate_record(GlucoseRecord, record.user_id, date_str, time_str):
             flash('A glucose record for this date and time already exists.', 'warning')
             return render_template('pages/edit_glucose_record.html', record=record)
 
@@ -264,11 +275,10 @@ def edit_glucose_record(id):
         try:
             db.session.commit()
             flash('Glucose record updated successfully!', 'success')
+            # Redirect to appropriate view based on user type
+            if current_user.user_type == "COMPANION":
+                return redirect(url_for('view_patient_data', patient_id=record.user_id))
             return redirect(url_for('glucose_logger'))
-        except IntegrityError:
-            db.session.rollback()
-            flash('A glucose record for this date and time already exists.', 'warning')
-            return render_template('pages/edit_glucose_record.html', record=record)
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating glucose record: {str(e)}', 'danger')
@@ -285,13 +295,23 @@ def edit_glucose_record(id):
 def edit_blood_pressure_record(id):
     """
     Edit an existing blood pressure record.
-
-    :param id: ID of the blood pressure record to edit.
     """
     record = BloodPressureRecord.query.get_or_404(id)
 
-    # Verify ownership
-    if record.user_id != current_user.id:
+    # Check permissions (either owner or authorized companion)
+    has_permission = False
+    if record.user_id == current_user.id:
+        has_permission = True
+    elif current_user.user_type == "COMPANION":
+        # Check companion access
+        access = CompanionAccess.query.filter_by(
+            patient_id=record.user_id,
+            companion_id=current_user.id,
+        ).first()
+        if access and access.blood_pressure_access == "EDIT":
+            has_permission = True
+
+    if not has_permission:
         flash("You do not have permission to edit this record.", 'danger')
         return redirect(url_for('blood_pressure_logger'))
 
@@ -303,11 +323,9 @@ def edit_blood_pressure_record(id):
             flash('Systolic and Diastolic values must be integers.', 'danger')
             return render_template('pages/edit_blood_pressure_record.html', record=record)
 
-        # Validate blood pressure ranges
-        MIN_SYSTOLIC = 90
-        MAX_SYSTOLIC = 180
-        MIN_DIASTOLIC = 60
-        MAX_DIASTOLIC = 120
+        # Validate ranges
+        MIN_SYSTOLIC, MAX_SYSTOLIC = 90, 180
+        MIN_DIASTOLIC, MAX_DIASTOLIC = 60, 120
 
         if not (MIN_SYSTOLIC <= new_systolic <= MAX_SYSTOLIC):
             flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
@@ -320,8 +338,8 @@ def edit_blood_pressure_record(id):
         date_str = request.form['date']
         time_str = request.form['time']
 
-        # Check for duplicate record only if date or time has changed
-        if (date_str != record.date or time_str != record.time) and is_duplicate_record(BloodPressureRecord, current_user.id, date_str, time_str):
+        # Check for duplicate record
+        if (date_str != record.date or time_str != record.time) and is_duplicate_record(BloodPressureRecord, record.user_id, date_str, time_str):
             flash('A blood pressure record for this date and time already exists.', 'warning')
             return render_template('pages/edit_blood_pressure_record.html', record=record)
 
@@ -334,18 +352,16 @@ def edit_blood_pressure_record(id):
         try:
             db.session.commit()
             flash('Blood pressure record updated successfully!', 'success')
+            # Redirect to appropriate view based on user type
+            if current_user.user_type == "COMPANION":
+                return redirect(url_for('view_patient_data', patient_id=record.user_id))
             return redirect(url_for('blood_pressure_logger'))
-        except IntegrityError:
-            db.session.rollback()
-            flash('A blood pressure record for this date and time already exists.', 'warning')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating blood pressure record: {str(e)}', 'danger')
             return render_template('pages/edit_blood_pressure_record.html', record=record)
 
     return render_template('pages/edit_blood_pressure_record.html', record=record)
-
 
 #----------------------------------------------------------------------------#
 # Medication Management Routes
@@ -425,8 +441,20 @@ def delete_medication(id):
 def edit_medication(id):
     medication = Medication.query.get_or_404(id)
     
-    # Verify ownership
-    if medication.user_id != current_user.id:
+    # Check permissions (either owner or authorized companion)
+    has_permission = False
+    if medication.user_id == current_user.id:
+        has_permission = True
+    elif current_user.user_type == "COMPANION":
+        # Check companion access
+        access = CompanionAccess.query.filter_by(
+            patient_id=medication.user_id,
+            companion_id=current_user.id
+        ).first()
+        if access and access.medication_access == "EDIT":
+            has_permission = True
+
+    if not has_permission:
         flash('Unauthorized access.', 'danger')
         return redirect(url_for('manage_medications'))
     
@@ -448,12 +476,20 @@ def edit_medication(id):
             
             db.session.commit()
             flash('Medication updated successfully!', 'success')
+            
+            # Redirect based on user type
+            if current_user.user_type == "COMPANION":
+                return redirect(url_for('view_patient_data', patient_id=medication.user_id))
             return redirect(url_for('manage_medications'))
+            
         except Exception as e:
             db.session.rollback()
             flash(f'Error updating medication: {str(e)}', 'danger')
             
-    return render_template('pages/edit_medication.html', form=form, medication=medication)
+    return render_template('pages/edit_medication.html', 
+                         form=form, 
+                         medication=medication,
+                         is_companion=current_user.user_type == "COMPANION")
 
 #----------------------------------------------------------------------------#
 # Medication Logging Route
@@ -815,13 +851,23 @@ def companion_setup():
                 
     return render_template('pages/companion_setup.html', form=form)
 
-@app.route('/patient/<int:patient_id>')
+@app.route('/companion/patients')
+@login_required
+def companion_patients():
+    if current_user.user_type != "COMPANION":
+        flash('Access denied.', 'danger')
+        return redirect(url_for('home'))
+    
+    connections = CompanionAccess.query.filter_by(companion_id=current_user.id).all()
+    return render_template('pages/companion_patients.html', connections=connections)
+
+@app.route('/companion/patient/<int:patient_id>')
 @login_required
 def view_patient_data(patient_id):
     if current_user.user_type != "COMPANION":
-        flash('Unauthorized access.', 'danger')
+        flash('Access denied.', 'danger')
         return redirect(url_for('home'))
-        
+    
     access = CompanionAccess.query.filter_by(
         patient_id=patient_id,
         companion_id=current_user.id
@@ -829,9 +875,24 @@ def view_patient_data(patient_id):
     
     patient = User.query.get_or_404(patient_id)
     
-    return render_template('pages/patient_data.html', 
+    glucose_data = []
+    if access.glucose_access != "NONE":
+        glucose_data = GlucoseRecord.query.filter_by(user_id=patient_id).all()
+        
+    blood_pressure_data = []
+    if access.blood_pressure_access != "NONE":
+        blood_pressure_data = BloodPressureRecord.query.filter_by(user_id=patient_id).all()
+        
+    medication_data = []
+    if access.medication_access != "NONE":
+        medication_data = Medication.query.filter_by(user_id=patient_id).all()
+    
+    return render_template('pages/patient_data.html',
                          patient=patient,
-                         access=access)
+                         access=access,
+                         glucose_data=glucose_data,
+                         blood_pressure_data=blood_pressure_data,
+                         medication_data=medication_data)
 
 
 @app.route('/logout')
