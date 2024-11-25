@@ -1,7 +1,7 @@
 #----------------------------------------------------------------------------#
 # Imports
 #----------------------------------------------------------------------------#
-
+from flask import session
 from flask import Flask, render_template, request, flash, redirect, url_for, send_file, jsonify
 from flask_migrate import Migrate
 from flask_sqlalchemy import SQLAlchemy
@@ -704,43 +704,71 @@ def update_access(connection_id):
         flash('Unauthorized access.', 'danger')
         return redirect(url_for('manage_connections'))
     
-    # Handle GET request - show the form
     if request.method == 'GET':
+        # Clear any existing messages when loading the form
+        session['_flashes'] = []
         return render_template('pages/companion_access.html',
                              access=connection)
     
-    # Handle POST request - process form submission
-    try:
-        connection.medication_access = request.form.get('medication_access', 'NONE')
-        connection.glucose_access = request.form.get('glucose_access', 'NONE')
-        connection.blood_pressure_access = request.form.get('blood_pressure_access', 'NONE')
-        connection.export_access = 'export_access' in request.form
-        
-        db.session.commit()
-        flash('Access levels updated successfully!', 'success')
-    except Exception as e:
-        db.session.rollback()
-        flash('Error updating access levels.', 'danger')
-        
+    if request.method == 'POST':
+        try:
+            # Get current values
+            old_values = {
+                'medication': connection.medication_access,
+                'glucose': connection.glucose_access,
+                'blood_pressure': connection.blood_pressure_access,
+            }
+            
+            # Get new values
+            new_values = {
+                'medication': request.form.get('medication_access', 'NONE'),
+                'glucose': request.form.get('glucose_access', 'NONE'),
+                'blood_pressure': request.form.get('blood_pressure_access', 'NONE'),
+            }
+            
+            # Only update if there are actual changes
+            if old_values != new_values:
+                connection.medication_access = new_values['medication']
+                connection.glucose_access = new_values['glucose']
+                connection.blood_pressure_access = new_values['blood_pressure']
+                
+                db.session.commit()
+                # Clear any existing messages before adding new one
+                session['_flashes'] = []
+                flash('Access levels updated successfully!', 'success')
+            
+        except Exception as e:
+            db.session.rollback()
+            # Clear any existing messages before adding new one
+            session['_flashes'] = []
+            flash(f'Error updating access levels: {str(e)}', 'danger')
+            return render_template('pages/companion_access.html', access=connection)
+            
     return redirect(url_for('manage_connections'))
-
 
 @app.route('/connections/<int:connection_id>/remove', methods=['POST'])
 @login_required
 def remove_connection(connection_id):
     if current_user.user_type != "PATIENT":
-        return jsonify({'error': 'Unauthorized'}), 403
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
-        return jsonify({'error': 'Unauthorized'}), 403
+        flash('Unauthorized access.', 'danger')
+        return redirect(url_for('manage_connections'))
         
     try:
         db.session.delete(connection)
         db.session.commit()
+        # Clear any existing "Connection removed" messages before adding new one
+        session['_flashes'] = [(category, message) for category, message in session.get('_flashes', [])
+                             if message != 'Connection removed successfully.']
         flash('Connection removed successfully.', 'success')
     except Exception as e:
         db.session.rollback()
+        session['_flashes'] = [(category, message) for category, message in session.get('_flashes', [])
+                             if message != 'Error removing connection.']
         flash('Error removing connection.', 'danger')
         
     return redirect(url_for('manage_connections'))
@@ -872,14 +900,47 @@ def companion_setup():
                 
     return render_template('pages/companion_setup.html', form=form)
 
-@app.route('/companion/patients')
+@app.route('/companion/patients', methods=['GET', 'POST'])
 @login_required
 def companion_patients():
     if current_user.user_type != "COMPANION":
         flash('Access denied.', 'danger')
         return redirect(url_for('home'))
     
-    # Get only approved connections (where at least one access is not NONE)
+    # Add form handling for linking new patients
+    form = CompanionLinkForm()
+    if request.method == 'POST' and form.validate_on_submit():
+        patient = User.query.filter_by(email=form.patient_email.data, user_type='PATIENT').first()
+        
+        if not patient:
+            flash('No patient account found with that email.', 'danger')
+        else:
+            # Check if already linked
+            existing_link = CompanionAccess.query.filter_by(
+                patient_id=patient.id,
+                companion_id=current_user.id
+            ).first()
+            
+            if existing_link:
+                flash('You are already linked with this patient.', 'warning')
+            else:
+                link = CompanionAccess(
+                    patient_id=patient.id,
+                    companion_id=current_user.id,
+                    medication_access='NONE',
+                    glucose_access='NONE',
+                    blood_pressure_access='NONE',
+                    export_access=False
+                )
+                
+                try:
+                    db.session.add(link)
+                    db.session.commit()
+                    flash('Successfully linked with patient. Waiting for access approval.', 'success')
+                except Exception as e:
+                    db.session.rollback()
+                    flash('An error occurred while linking with patient.', 'danger')
+    
     connections = CompanionAccess.query.filter(
         CompanionAccess.companion_id == current_user.id,
         db.or_(
@@ -889,7 +950,6 @@ def companion_patients():
         )
     ).all()
     
-    # Get pending connections
     pending_connections = CompanionAccess.query.filter_by(
         companion_id=current_user.id,
         medication_access="NONE",
@@ -898,6 +958,7 @@ def companion_patients():
     ).all()
     
     return render_template('pages/companion_patients.html', 
+                         form=form,
                          connections=connections,
                          pending_connections=pending_connections)
 

@@ -10,19 +10,6 @@
                     <h4 class="mb-0">Manage Access for {{ access.companion.username }}</h4>
                 </div>
                 <div class="card-body">
-                    {% with messages = get_flashed_messages(with_categories=true) %}
-                        {% if messages %}
-                            {% for category, message in messages %}
-                                <div class="alert alert-{{ category }} alert-dismissible fade show">
-                                    {{ message }}
-                                    <button type="button" class="close" data-dismiss="alert">
-                                        <span>&times;</span>
-                                    </button>
-                                </div>
-                            {% endfor %}
-                        {% endif %}
-                    {% endwith %}
-                    
                     <form method="POST" action="{{ url_for('update_access', connection_id=access.id) }}">
                         <div class="form-group mb-3">
                             <label class="form-label">Medication Records Access</label>
@@ -60,13 +47,10 @@
                             </small>
                         </div>
                         
-                        
-                        <div class="d-grid gap-2">
+                        <div class="d-flex justify-content-between mt-4">
                             <button type="submit" class="btn btn-primary">Update Access Settings</button>
                             <a href="{{ url_for('manage_connections') }}" class="btn btn-secondary">Back to Connections</a>
-                            
-                            <!-- Remove Companion Button -->
-                            <button type="button" class="btn btn-danger mt-3"
+                            <button type="button" class="btn btn-danger"
                                     onclick="if(confirm('Are you sure you want to remove this companion? This action cannot be undone.')) document.getElementById('remove-form').submit()">
                                 Remove Companion
                             </button>
@@ -91,6 +75,8 @@
     padding: 0.5rem;
     border-radius: 0.25rem;
     border: 1px solid #ced4da;
+    width: 100%;
+    display: block;
 }
 
 .form-select:focus {
@@ -106,18 +92,21 @@
 .btn {
     padding: 0.5rem 1rem;
     font-weight: 500;
-}
-
-.btn-danger {
-    margin-top: 1rem;
+    white-space: nowrap;
 }
 
 .card {
     border: none;
 }
 
-.alert {
-    border-radius: 10px;
+/* Fix button spacing */
+.d-flex.justify-content-between {
+    gap: 1rem;
+}
+
+.d-flex.justify-content-between .btn {
+    flex: 1;
+    text-align: center;
 }
 </style>
 {% endblock %}
