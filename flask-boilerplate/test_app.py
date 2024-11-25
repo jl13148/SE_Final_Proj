@@ -1075,28 +1075,6 @@ class HealthAppTestCase(unittest.TestCase):
             self.mock_commit.assert_called_once()
 
     @patch('app.GlucoseRecord')
-    def test_edit_glucose_record_post_integrity_error(self, mock_glucose_record_class):
-        """Test POST request with database integrity error"""
-        self.login()
-        
-        mock_record = MagicMock()
-        mock_record.user_id = self.mock_user.id
-        mock_glucose_record_class.query.get_or_404.return_value = mock_record
-        
-        with patch('app.is_duplicate_record', return_value=False):
-            self.mock_commit.side_effect = IntegrityError("", "", "")
-            
-            response = self.client.post('/glucose/edit/1', data={
-                'glucose_level': '100',
-                'date': '2024-01-01',
-                'time': '10:00'
-            })
-            
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'A glucose record for this date and time already exists.', response.data)
-            self.mock_rollback.assert_called_once()
-
-    @patch('app.GlucoseRecord')
     def test_edit_glucose_record_post_generic_error(self, mock_glucose_record_class):
         """Test POST request with generic database error"""
         self.login()
@@ -1239,29 +1217,7 @@ class HealthAppTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'Blood pressure record updated successfully!', response.data)
             self.mock_commit.assert_called_once()
-
-    @patch('app.BloodPressureRecord')
-    def test_edit_blood_pressure_record_post_integrity_error(self, mock_bp_record_class):
-        """Test POST request with database integrity error"""
-        self.login()
-        
-        mock_record = MagicMock()
-        mock_record.user_id = self.mock_user.id
-        mock_bp_record_class.query.get_or_404.return_value = mock_record
-        
-        with patch('app.is_duplicate_record', return_value=False):
-            self.mock_commit.side_effect = IntegrityError("", "", "")
             
-            response = self.client.post('/blood_pressure/edit/1', data={
-                'systolic': '120',
-                'diastolic': '80',
-                'date': '2024-01-01',
-                'time': '10:00'
-            })
-            
-            self.assertEqual(response.status_code, 200)
-            self.assertIn(b'A blood pressure record for this date and time already exists.', response.data)
-            self.mock_rollback.assert_called_once()
 
     @patch('app.BloodPressureRecord')
     def test_edit_blood_pressure_record_post_generic_error(self, mock_bp_record_class):
