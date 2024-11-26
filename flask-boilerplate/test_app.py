@@ -72,6 +72,262 @@ class HealthAppTestCase(unittest.TestCase):
         with patch('flask_login.utils._get_user', return_value=self.mock_user):
             pass
 
+#----------------------------------------------------------------------------#
+# Login and Register Tests
+#----------------------------------------------------------------------------#
+    def test_login_success_patient(self):
+        """Test successful login for patient users"""
+        with patch('app.LoginForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Create mock user
+            mock_user = MagicMock(spec=User)
+            mock_user.user_type = 'PATIENT'
+            mock_user.check_password.return_value = True
+            mock_user.patients = []
+            
+            # Setup form mock with proper data
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.email.data = 'test@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'PATIENT'
+            mock_form.remember.data = True
+            MockForm.return_value = mock_form
+
+            # Setup user query mock
+            with patch('app.User.query') as mock_query:
+                mock_query.filter_by.return_value.first.return_value = mock_user
+
+                # Setup login_user mock
+                with patch('app.login_user') as mock_login:
+                    response = self.client.post('/login', data={
+                        'email': 'test@test.com',
+                        'password': 'password',
+                        'user_type': 'PATIENT',
+                        'remember': True
+                    })
+
+                    mock_login.assert_called_once_with(mock_user, remember=True)
+                    self.assertEqual(response.status_code, 302)
+                    self.assertEqual(response.location, '/')
+
+    def test_login_success_companion_no_patients(self):
+        """Test successful login for companion without linked patients"""
+        with patch('app.LoginForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Create mock user
+            mock_user = MagicMock(spec=User)
+            mock_user.user_type = 'companion'
+            mock_user.check_password.return_value = True
+            mock_user.patients = []  # No linked patients
+            
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.email.data = 'companion@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'companion'
+            mock_form.remember.data = True
+            MockForm.return_value = mock_form
+            
+            with patch('app.User.query') as mock_query, \
+                patch('app.login_user') as mock_login:
+                mock_query.filter_by.return_value.first.return_value = mock_user
+                
+                response = self.client.post('/login', data={
+                    'email': 'companion@test.com',
+                    'password': 'password',
+                    'user_type': 'companion',
+                    'remember': True
+                })
+                
+                mock_login.assert_called_once_with(mock_user, remember=True)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.location, '/companion/setup')
+
+    def test_login_success_companion_with_patients(self):
+        """Test successful login for companion with linked patients"""
+        with patch('app.LoginForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Create mock user
+            mock_user = MagicMock(spec=User)
+            mock_user.user_type = 'companion'
+            mock_user.check_password.return_value = True
+            mock_user.patients = [MagicMock()]  # Has linked patients
+            
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.email.data = 'companion@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'companion'
+            mock_form.remember.data = True
+            MockForm.return_value = mock_form
+            
+            with patch('app.User.query') as mock_query, \
+                patch('app.login_user') as mock_login:
+                mock_query.filter_by.return_value.first.return_value = mock_user
+                
+                response = self.client.post('/login', data={
+                    'email': 'companion@test.com',
+                    'password': 'password',
+                    'user_type': 'companion',
+                    'remember': True
+                })
+                
+                mock_login.assert_called_once_with(mock_user, remember=True)
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.location, '/')
+
+    def test_login_invalid_credentials(self):
+        """Test login with invalid credentials"""
+        with patch('app.LoginForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.email.data = 'test@test.com'
+            mock_form.password.data = 'wrongpassword'
+            mock_form.user_type.data = 'PATIENT'
+            MockForm.return_value = mock_form
+            
+            with patch('app.User.query') as mock_query, \
+                patch('app.render_template') as mock_render:
+                # User not found
+                mock_query.filter_by.return_value.first.return_value = None
+                mock_render.return_value = ''
+                
+                response = self.client.post('/login', data={
+                    'email': 'test@test.com',
+                    'password': 'wrongpassword',
+                    'user_type': 'PATIENT'
+                })
+                
+                self.assertEqual(response.status_code, 200)
+
+    def test_register_success_patient(self):
+        """Test successful registration for patient user"""
+        with patch('app.RegisterForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Setup form mock with validation passing
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.username.data = 'testuser'
+            mock_form.email.data = 'test@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'PATIENT'
+            MockForm.return_value = mock_form
+            
+            with patch('app.User') as MockUser:
+                # Setup mock user
+                mock_user = MagicMock()
+                mock_user.set_password = MagicMock()
+                MockUser.return_value = mock_user
+                
+                response = self.client.post('/register', data={
+                    'username': 'testuser',
+                    'email': 'test@test.com',
+                    'password': 'password',
+                    'confirm_password': 'password',
+                    'user_type': 'PATIENT'
+                })
+                
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.location, '/login')
+                self.mock_add.assert_called_once_with(mock_user)
+                self.mock_commit.assert_called_once()
+
+    def test_register_success_companion(self):
+        """Test successful registration for companion user"""
+        with patch('app.RegisterForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False):
+            
+            # Setup form mock with validation passing
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.username.data = 'companion'
+            mock_form.email.data = 'companion@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'COMPANION'
+            MockForm.return_value = mock_form
+            
+            with patch('app.User') as MockUser, \
+                patch('app.login_user') as mock_login:
+                # Setup mock user
+                mock_user = MagicMock()
+                mock_user.set_password = MagicMock()
+                MockUser.return_value = mock_user
+                
+                response = self.client.post('/register', data={
+                    'username': 'companion',
+                    'email': 'companion@test.com',
+                    'password': 'password',
+                    'confirm_password': 'password',
+                    'user_type': 'COMPANION'
+                })
+                
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response.location, '/companion/setup')
+                mock_login.assert_called_once_with(mock_user)
+                self.mock_add.assert_called_once_with(mock_user)
+                self.mock_commit.assert_called_once()
+
+    def test_register_database_error(self):
+        """Test registration with database error"""
+        with patch('app.RegisterForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False), \
+            patch('app.render_template') as mock_render:
+            
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.username.data = 'testuser'
+            mock_form.email.data = 'test@test.com'
+            mock_form.password.data = 'password'
+            mock_form.user_type.data = 'PATIENT'
+            MockForm.return_value = mock_form
+            
+            with patch('app.User') as MockUser:
+                mock_user = MagicMock()
+                MockUser.return_value = mock_user
+                mock_render.return_value = ''
+                
+                # Force database error
+                self.mock_commit.side_effect = Exception("Database error")
+                
+                response = self.client.post('/register', data={
+                    'username': 'testuser',
+                    'email': 'test@test.com',
+                    'password': 'password',
+                    'confirm_password': 'password',
+                    'user_type': 'PATIENT'
+                })
+                
+                self.assertEqual(response.status_code, 200)
+                self.mock_rollback.assert_called_once()
+
+    def test_register_form_validation_error(self):
+        """Test registration with form validation error"""
+        with patch('app.RegisterForm') as MockForm, \
+            patch('app.current_user', is_authenticated=False), \
+            patch('app.render_template') as mock_render:
+            
+            # Setup form mock with validation failing
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = False
+            MockForm.return_value = mock_form
+            mock_render.return_value = ''
+            
+            response = self.client.post('/register', data={})
+            
+            self.assertEqual(response.status_code, 200)
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
 
 #----------------------------------------------------------------------------#
 # Medication Management Tests
