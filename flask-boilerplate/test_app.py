@@ -1,12 +1,12 @@
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch, MagicMock, ANY
 from datetime import datetime, time, timedelta
 from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
 from werkzeug.exceptions import NotFound
 from django.db import IntegrityError
 from app import app, ExportPDFForm, ExportCSVForm
-from models import User, Medication, MedicationLog, GlucoseRecord, BloodPressureRecord
+from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog, UserType, AccessLevel, CompanionAccess
 import json
 import HtmlTestRunner
 
@@ -14,12 +14,16 @@ class HealthAppTestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
         app.config['WTF_CSRF_ENABLED'] = False
+        app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///:memory:'
         app.config['SERVER_NAME'] = 'localhost'
         app.config['PREFERRED_URL_SCHEME'] = 'http'
 
         self.app_context = app.app_context()
         self.app_context.push()
         self.client = app.test_client()
+
+        # Create all database tables
+        db.create_all()
 
         # Mock database session
         self.patcher_add = patch('app.db.session.add')
@@ -38,6 +42,11 @@ class HealthAppTestCase(unittest.TestCase):
         self.mock_user.email = 'test@example.com'
         self.mock_user.is_authenticated = True
 
+        # Mock the utility_processor with proper context
+        self.mock_context = {'pending_connections_count': 0}
+        self.patcher_utility = patch('app.utility_processor', return_value=self.mock_context)
+        self.mock_utility = self.patcher_utility.start()
+
         # Patch User.query.get and current_user
         self.patcher_user = patch('models.User.query.get', return_value=self.mock_user)
         self.mock_query_get = self.patcher_user.start()
@@ -45,11 +54,15 @@ class HealthAppTestCase(unittest.TestCase):
         self.mock_login = self.patcher_login.start()
 
     def tearDown(self):
+        db.session.remove()
+        db.drop_all()
         self.patcher_add.stop()
         self.patcher_commit.stop()
         self.patcher_rollback.stop()
+        self.patcher_delete.stop()
         self.patcher_user.stop()
         self.patcher_login.stop()
+        self.patcher_utility.stop()
         self.app_context.pop()
 
     def login(self):
@@ -59,7 +72,10 @@ class HealthAppTestCase(unittest.TestCase):
         with patch('flask_login.utils._get_user', return_value=self.mock_user):
             pass
 
-    # Medication Management Tests
+
+#----------------------------------------------------------------------------#
+# Medication Management Tests
+#----------------------------------------------------------------------------#
     def test_medications_redirect(self):
         """Test /medications redirect"""
         response = self.client.get('/medications')
@@ -562,7 +578,9 @@ class HealthAppTestCase(unittest.TestCase):
         self.assertIn(b'Error updating medication: Database error', response.data)
         self.mock_rollback.assert_called_once()
 
-
+#----------------------------------------------------------------------------#
+# Health Logger Tests
+#----------------------------------------------------------------------------#
     # Tests for /glucose route
     @patch('app.GlucoseRecord')
     def test_glucose_get_requires_login(self, mock_glucose_record):
@@ -1217,7 +1235,6 @@ class HealthAppTestCase(unittest.TestCase):
             self.assertEqual(response.status_code, 200)
             self.assertIn(b'Blood pressure record updated successfully!', response.data)
             self.mock_commit.assert_called_once()
-            
 
     @patch('app.BloodPressureRecord')
     def test_edit_blood_pressure_record_post_generic_error(self, mock_bp_record_class):
@@ -1242,7 +1259,9 @@ class HealthAppTestCase(unittest.TestCase):
             self.assertIn(b'Error updating blood pressure record: Database error', response.data)
             self.mock_rollback.assert_called_once()
 
-
+#----------------------------------------------------------------------------#
+# Health Reporter Tests
+#----------------------------------------------------------------------------#
     def test_health_reports_get(self):
         """Test GET request to health reports page"""
         response = self.client.get('/health-reports')
@@ -1389,22 +1408,6 @@ class HealthAppTestCase(unittest.TestCase):
                 self.assertEqual(response.status_code, 302)
                 self.assertTrue(response.location.endswith('/export/pdf'))
 
-    # def test_health_reports_csv_form_submission(self):
-    #     """Test CSV form submission on the health reports page"""
-    #     with patch('app.ExportCSVForm') as MockCSVForm:
-    #         # Configure the mock form
-    #         mock_form = MockCSVForm.return_value
-    #         mock_form.validate_on_submit.return_value = True
-    #         mock_form.submit.data = True
-            
-    #         with self.client as client:
-    #             response = client.post('/health-reports', data={
-    #                 'submit': True
-    #             })
-                
-    #             self.assertEqual(response.status_code, 302)
-    #             self.assertTrue(response.location.endswith('/export/csv'))
-
     def test_health_reports_invalid_form_submission(self):
         """Test invalid form submission on the health reports page"""
         with patch('app.ExportPDFForm') as MockPDFForm, \
@@ -1416,6 +1419,337 @@ class HealthAppTestCase(unittest.TestCase):
             with self.client as client:
                 response = client.post('/health-reports', data={})
                 self.assertEqual(response.status_code, 200)
+
+#----------------------------------------------------------------------------#
+# Companion Management Tests
+#----------------------------------------------------------------------------#
+    def test_companion_setup_get(self):
+        """Test GET request to companion setup page"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.render_template') as mock_render:
+            mock_render.return_value = 'companion setup page'
+            response = self.client.get('/companion/setup')
+            
+            self.assertEqual(response.status_code, 200)
+            mock_render.assert_called_with('pages/companion_setup.html', form=ANY)
+
+    def test_companion_setup_non_companion_redirect(self):
+        """Test companion setup access by non-companion user"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        response = self.client.get('/companion/setup')
+        
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.location, '/')
+
+    def test_companion_setup_post_success(self):
+        """Test successful companion-patient linking"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        mock_patient = MagicMock(spec=User)
+        mock_patient.id = 2
+        mock_patient.email = 'patient@test.com'
+        mock_patient.user_type = 'PATIENT'
+        
+        with patch('app.User.query') as mock_user_query, \
+            patch('app.CompanionAccess.query') as mock_access_query:
+            # Setup mock queries
+            mock_user_query.filter_by.return_value.first.return_value = mock_patient
+            mock_access_query.filter_by.return_value.first.return_value = None
+            
+            response = self.client.post('/companion/setup', data={
+                'patient_email': 'patient@test.com'
+            })
+            
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/')
+            self.mock_add.assert_called_once()
+            self.mock_commit.assert_called_once()
+
+    def test_companion_patients_list(self):
+        """Test companion's patient list view"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        mock_approved = MagicMock()
+        mock_approved.patient = MagicMock(username='Test Patient', email='patient@test.com')
+        mock_approved.medication_access = 'VIEW'
+        mock_approved.glucose_access = 'EDIT'
+        mock_approved.blood_pressure_access = 'VIEW'
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.render_template') as mock_render, \
+            patch('app.CompanionLinkForm') as MockForm:
+            # Setup form mock
+            mock_form = MagicMock()
+            MockForm.return_value = mock_form
+            
+            # Setup query mocks
+            mock_query.filter.return_value.all.return_value = [mock_approved]
+            mock_query.filter_by.return_value.all.return_value = []
+            mock_render.return_value = 'patients list page'
+            
+            response = self.client.get('/companion/patients')
+            
+            self.assertEqual(response.status_code, 200)
+            mock_render.assert_called_with('pages/companion_patients.html', 
+                                        form=mock_form,
+                                        connections=[mock_approved],
+                                        pending_connections=[])
+
+    def test_view_patient_data_success(self):
+        """Test viewing patient data by authorized companion"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        mock_access = MagicMock()
+        mock_access.glucose_access = 'VIEW'
+        mock_access.blood_pressure_access = 'VIEW'
+        mock_access.medication_access = 'VIEW'
+        mock_patient = MagicMock(spec=User)
+        
+        with patch('app.CompanionAccess.query') as mock_access_query, \
+            patch('app.User.query') as mock_user_query, \
+            patch('app.render_template') as mock_render:
+            mock_access_query.filter_by.return_value.first_or_404.return_value = mock_access
+            mock_user_query.get_or_404.return_value = mock_patient
+            mock_render.return_value = 'patient data page'
+            
+            response = self.client.get('/companion/patient/2')
+            
+            self.assertEqual(response.status_code, 200)
+            mock_render.assert_called_with('pages/patient_data.html',
+                                        patient=mock_patient,
+                                        access=mock_access,
+                                        glucose_data=ANY,
+                                        blood_pressure_data=ANY,
+                                        medication_data=ANY)
+
+    def test_manage_connections_patient_only(self):
+        """Test that only patients can access connection management"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.flash') as mock_flash:
+            response = self.client.get('/connections')
+            
+            self.assertEqual(response.status_code, 302)
+            mock_flash.assert_called_with('Only patients can manage connections.', 'danger')
+            self.assertEqual(response.location, '/')
+
+    def test_approve_connection_success(self):
+        """Test successful connection approval by patient"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id
+        mock_connection.companion = MagicMock(username='test_companion')
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            mock_query.get_or_404.return_value = mock_connection
+            
+            response = self.client.post('/connections/1/approve')
+            
+            self.assertEqual(response.status_code, 302)
+            mock_flash.assert_called_with(
+                f'Connection approved. Please set access levels for {mock_connection.companion.username}.', 
+                'success'
+            )
+            self.mock_commit.assert_called_once()
+
+    def test_reject_connection_success(self):
+        """Test successful connection rejection by patient"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            mock_query.get_or_404.return_value = mock_connection
+            
+            response = self.client.post('/connections/1/reject')
+            
+            self.assertEqual(response.status_code, 302)
+            mock_flash.assert_called_with('Connection rejected.', 'success')
+            self.mock_delete.assert_called_once_with(mock_connection)
+            self.mock_commit.assert_called_once()
+
+    def test_update_access_levels_success(self):
+        """Test successful update of companion access levels"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            mock_query.get_or_404.return_value = mock_connection
+            
+            response = self.client.post('/connections/1/access', data={
+                'medication_access': 'VIEW',
+                'glucose_access': 'EDIT',
+                'blood_pressure_access': 'VIEW',
+                'export_access': 'true'
+            })
+            
+            self.assertEqual(response.status_code, 302)
+            mock_flash.assert_called_with('Access levels updated successfully!', 'success')
+            self.assertEqual(mock_connection.medication_access, 'VIEW')
+            self.assertEqual(mock_connection.glucose_access, 'EDIT')
+            self.assertEqual(mock_connection.blood_pressure_access, 'VIEW')
+            self.mock_commit.assert_called_once()
+
+
+    def test_companion_setup_post_duplicate_link(self):
+        """Test attempting to create duplicate companion-patient link"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.User.query') as mock_user_query, \
+            patch('app.CompanionAccess.query') as mock_access_query, \
+            patch('app.CompanionLinkForm') as MockForm:
+            # Setup mock form
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.patient_email.data = 'patient@test.com'
+            MockForm.return_value = mock_form
+            
+            # Mock existing link
+            mock_access_query.filter_by.return_value.first.return_value = MagicMock()
+            
+            response = self.client.post('/companion/setup', data={
+                'patient_email': 'patient@test.com'
+            }, follow_redirects=True)
+            
+            self.assertEqual(response.status_code, 200)
+            self.assertIn(b'You are already linked with this patient', response.data)
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_view_patient_data_unauthorized(self):
+        """Test viewing patient data without proper access"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.CompanionAccess.query') as mock_query:
+            mock_query.filter_by.return_value.first_or_404.side_effect = NotFound()
+            
+            response = self.client.get('/companion/patient/2')
+            
+            self.assertEqual(response.status_code, 404)
+
+    def test_remove_connection_success(self):
+        """Test successful connection removal by patient"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        # Create mock connection
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash, \
+            patch('app.session', dict()) as mock_session, \
+            patch('app.utility_processor', return_value={'pending_connections_count': 0}):
+            # Setup mock query to return our mock connection
+            mock_query.get_or_404.return_value = mock_connection
+            
+            response = self.client.post('/connections/1/remove')
+            
+            # Verify response
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/connections')
+            
+            # Verify database operations
+            self.mock_delete.assert_called_once_with(mock_connection)
+            self.mock_commit.assert_called_once()
+            
+            # Verify flash message
+            mock_flash.assert_called_with('Connection removed successfully.', 'success')
+
+    def test_remove_connection_unauthorized_user_type(self):
+        """Test connection removal attempt by non-patient user"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.flash') as mock_flash, \
+            patch('app.utility_processor', return_value={'pending_connections_count': 0}):
+            response = self.client.post('/connections/1/remove')
+            
+            # Verify response
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/')
+            
+            # Verify error message
+            mock_flash.assert_called_with('Unauthorized access.', 'danger')
+            
+            # Verify no database operations occurred
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_remove_connection_unauthorized_patient(self):
+        """Test connection removal attempt by wrong patient"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        # Create mock connection with different patient_id
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id + 1
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash, \
+            patch('app.utility_processor', return_value={'pending_connections_count': 0}):
+            mock_query.get_or_404.return_value = mock_connection
+            
+            response = self.client.post('/connections/1/remove')
+            
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/connections')
+            
+            mock_flash.assert_called_with('Unauthorized access.', 'danger')
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_remove_connection_not_found(self):
+        """Test removal of non-existent connection"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.render_template', return_value='') as mock_render, \
+            patch('app.utility_processor', return_value={'pending_connections_count': 0}):
+            # Setup mock query to raise 404
+            mock_query.get_or_404.side_effect = NotFound()
+            
+            # Mock the template rendering for 404
+            mock_render.return_value = ''
+            
+            response = self.client.post('/connections/1/remove')
+            
+            self.assertEqual(response.status_code, 404)
+            self.mock_delete.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_remove_connection_database_error(self):
+        """Test connection removal with database error"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        mock_connection = MagicMock()
+        mock_connection.patient_id = self.mock_user.id
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.flash') as mock_flash, \
+            patch('app.session', dict()) as mock_session, \
+            patch('app.utility_processor', return_value={'pending_connections_count': 0}):
+            mock_query.get_or_404.return_value = mock_connection
+            
+            # Force database error
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            response = self.client.post('/connections/1/remove')
+            
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/connections')
+            
+            self.mock_rollback.assert_called_once()
+            mock_flash.assert_called_with('Error removing connection.', 'danger')
+            
+            # Reset the side effect
+            self.mock_commit.side_effect = None
 
 
 if __name__ == '__main__':
