@@ -1,11 +1,13 @@
 import unittest
-from unittest.mock import patch, MagicMock, ANY
+from unittest.mock import patch, MagicMock, ANY, call 
 from datetime import datetime, time, timedelta
+from click.testing import CliRunner
+from flask.cli import ScriptInfo
 from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
 from werkzeug.exceptions import NotFound
 from django.db import IntegrityError
-from app import app, ExportPDFForm, ExportCSVForm
+from app import app, ExportPDFForm, ExportCSVForm, reset_db, init_db
 from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog, UserType, AccessLevel, CompanionAccess
 import json
 import HtmlTestRunner
@@ -329,6 +331,149 @@ class HealthAppTestCase(unittest.TestCase):
             self.mock_add.assert_not_called()
             self.mock_commit.assert_not_called()
 
+#----------------------------------------------------------------------------#
+# Database Tests
+#----------------------------------------------------------------------------#
+    def test_reset_db_success(self):
+        """Test successful database reset"""
+        runner = CliRunner()
+        
+        with patch('app.db.drop_all') as mock_drop, \
+            patch('app.db.create_all') as mock_create:
+            
+            # Create an app context for the command
+            obj = ScriptInfo(create_app=lambda info: app)
+            
+            # Run the command
+            result = runner.invoke(reset_db, obj=obj)
+            
+            # Verify command execution
+            self.assertEqual(result.exit_code, 0)
+            mock_drop.assert_called_once()
+            mock_create.assert_called_once()
+            self.assertIn('Database has been reset!', result.output)
+
+    def test_init_db_empty_database(self):
+        """Test database initialization when no tables exist"""
+        with patch('app.db.engine.connect') as mock_connect, \
+            patch('app.db.inspect') as mock_inspect, \
+            patch('app.db.create_all') as mock_create_all, \
+            patch('builtins.print') as mock_print:
+            
+            # Mock inspector to return empty table list
+            mock_inspector = MagicMock()
+            mock_inspector.get_table_names.return_value = []
+            mock_inspect.return_value = mock_inspector
+            
+            result = init_db()
+            
+            # Verify all expected operations occurred
+            self.assertTrue(result)
+            mock_connect.assert_called_once()
+            mock_create_all.assert_called_once()
+            
+            # Verify print messages
+            mock_print.assert_has_calls([
+                call("No tables found. Creating database schema..."),
+                call("Database schema created successfully!")
+            ])
+
+    def test_init_db_existing_tables(self):
+        """Test database initialization when tables already exist"""
+        with patch('app.db.engine.connect') as mock_connect, \
+            patch('app.db.inspect') as mock_inspect, \
+            patch('builtins.print') as mock_print:
+            
+            # Mock inspector to return all expected tables
+            expected_tables = [
+                'users',
+                'medications',
+                'glucose_records',
+                'blood_pressure_records',
+                'medication_logs',
+                'companion_access'
+            ]
+            mock_inspector = MagicMock()
+            mock_inspector.get_table_names.return_value = expected_tables
+            mock_inspect.return_value = mock_inspector
+            
+            result = init_db()
+            
+            # Verify operations
+            self.assertTrue(result)
+            mock_connect.assert_called_once()
+            mock_print.assert_called_once_with(f"Found existing tables: {expected_tables}")
+
+    def test_init_db_missing_tables(self):
+        """Test database initialization when some tables are missing"""
+        with patch('app.db.engine.connect') as mock_connect, \
+            patch('app.db.inspect') as mock_inspect, \
+            patch('builtins.print') as mock_print:
+            
+            # Mock inspector to return partial table list
+            existing_tables = ['users', 'medications']
+            mock_inspector = MagicMock()
+            mock_inspector.get_table_names.return_value = existing_tables
+            mock_inspect.return_value = mock_inspector
+            
+            # Mock table creation
+            mock_table = MagicMock()
+            expected_missing_tables = [
+                'glucose_records',
+                'blood_pressure_records',
+                'medication_logs',
+                'companion_access'
+            ]
+            
+            # Mock the models' __table__ attribute
+            for model in [GlucoseRecord, BloodPressureRecord, MedicationLog, CompanionAccess]:
+                setattr(model, '__table__', mock_table)
+            
+            result = init_db()
+            
+            # Verify operations
+            self.assertTrue(result)
+            mock_connect.assert_called_once()
+            
+            # Verify print messages for missing tables
+            expected_calls = [call(f"Found existing tables: {existing_tables}")] + \
+                            [call(f"Creating missing table: {table}") for table in expected_missing_tables]
+            mock_print.assert_has_calls(expected_calls, any_order=True)
+            
+            # Verify table creation calls
+            self.assertEqual(mock_table.create.call_count, len(expected_missing_tables))
+
+    def test_init_db_connection_error(self):
+        """Test database initialization when connection fails"""
+        with patch('app.db.engine.connect') as mock_connect, \
+            patch('builtins.print') as mock_print:
+            
+            # Force connection error
+            mock_connect.side_effect = Exception("Connection failed")
+            
+            result = init_db()
+            
+            # Verify operations
+            self.assertFalse(result)
+            mock_connect.assert_called_once()
+            mock_print.assert_called_once_with("Database initialization error: Connection failed")
+
+    def test_init_db_inspection_error(self):
+        """Test database initialization when inspection fails"""
+        with patch('app.db.engine.connect') as mock_connect, \
+            patch('app.db.inspect') as mock_inspect, \
+            patch('builtins.print') as mock_print:
+            
+            # Force inspection error
+            mock_inspect.side_effect = Exception("Inspection failed")
+            
+            result = init_db()
+            
+            # Verify operations
+            self.assertFalse(result)
+            mock_connect.assert_called_once()
+            mock_print.assert_called_once_with("Database initialization error: Inspection failed")
+            
 #----------------------------------------------------------------------------#
 # Medication Management Tests
 #----------------------------------------------------------------------------#
@@ -2006,6 +2151,237 @@ class HealthAppTestCase(unittest.TestCase):
             
             # Reset the side effect
             self.mock_commit.side_effect = None
+
+    def test_companion_patients_unauthorized_user(self):
+        """Test accessing companion patients page as non-companion user"""
+        self.mock_user.user_type = 'PATIENT'
+        
+        with patch('app.flash') as mock_flash:
+            response = self.client.get('/companion/patients')
+            
+            self.assertEqual(response.status_code, 302)
+            self.assertEqual(response.location, '/')
+            mock_flash.assert_called_once_with('Access denied.', 'danger')
+
+    def test_companion_patients_get_success(self):
+        """Test successful GET request to companion patients page"""
+        self.mock_user.user_type = 'COMPANION'
+        self.mock_user.id = 1
+        
+        # Create mock approved and pending connections
+        mock_approved = [MagicMock(spec=CompanionAccess)]
+        mock_approved[0].medication_access = 'VIEW'
+        mock_approved[0].glucose_access = 'VIEW'
+        mock_approved[0].blood_pressure_access = 'NONE'
+        
+        mock_pending = MagicMock(spec=CompanionAccess)
+        mock_pending.medication_access = 'NONE'
+        mock_pending.glucose_access = 'NONE'
+        mock_pending.blood_pressure_access = 'NONE'
+        
+        with patch('app.CompanionAccess.query') as mock_query, \
+            patch('app.render_template') as mock_render, \
+            patch('app.CompanionLinkForm') as MockForm:
+            # Setup form mock
+            mock_form = MagicMock()
+            MockForm.return_value = mock_form
+            
+            # Setup query chains for approved connections
+            filter_chain = MagicMock()
+            filter_chain.all.return_value = mock_approved
+            mock_query.filter.return_value = filter_chain
+            
+            # Setup pending connections query
+            mock_query.filter_by.return_value.all.return_value = [mock_pending]
+            
+            # Mock render_template
+            mock_render.return_value = ''
+            
+            response = self.client.get('/companion/patients')
+            
+            # Verify response
+            self.assertEqual(response.status_code, 200)
+            
+            # Get the actual call args
+            call_args = mock_render.call_args
+            args, kwargs = call_args
+            
+            # Verify template name
+            self.assertEqual(args[0], 'pages/companion_patients.html')
+            
+            # Verify kwargs exist
+            self.assertIn('form', kwargs)
+            self.assertIn('connections', kwargs)
+            self.assertIn('pending_connections', kwargs)
+            
+            # Verify kwargs types
+            self.assertIsInstance(kwargs['pending_connections'], list)
+            self.assertEqual(len(kwargs['pending_connections']), 1)
+
+    def test_companion_patients_link_new_patient_success(self):
+        """Test successful patient linking"""
+        self.mock_user.user_type = 'COMPANION'
+        self.mock_user.id = 1
+        
+        # Create mock patient
+        mock_patient = MagicMock(spec=User)
+        mock_patient.id = 2
+        mock_patient.email = 'patient@test.com'
+        mock_patient.user_type = 'PATIENT'
+        
+        with patch('app.CompanionLinkForm') as MockForm, \
+            patch('app.User.query') as mock_user_query, \
+            patch('app.CompanionAccess.query') as mock_access_query, \
+            patch('app.flash') as mock_flash:
+            # Setup form mock with validation
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.patient_email.data = 'patient@test.com'
+            MockForm.return_value = mock_form
+            
+            # Setup query mocks
+            mock_user_query.filter_by.return_value.first.return_value = mock_patient
+            mock_access_query.filter_by.return_value.first.return_value = None
+            
+            response = self.client.post('/companion/patients', data={
+                'patient_email': 'patient@test.com'
+            })
+            
+            # Verify the CompanionAccess object creation
+            expected_link = CompanionAccess(
+                patient_id=mock_patient.id,
+                companion_id=self.mock_user.id,
+                medication_access='NONE',
+                glucose_access='NONE',
+                blood_pressure_access='NONE',
+                export_access=False
+            )
+            
+            args, _ = self.mock_add.call_args
+            actual_link = args[0]
+            
+            self.assertEqual(actual_link.patient_id, expected_link.patient_id)
+            self.assertEqual(actual_link.companion_id, expected_link.companion_id)
+            self.assertEqual(actual_link.medication_access, expected_link.medication_access)
+            self.assertEqual(actual_link.glucose_access, expected_link.glucose_access)
+            self.assertEqual(actual_link.blood_pressure_access, expected_link.blood_pressure_access)
+            self.assertEqual(actual_link.export_access, expected_link.export_access)
+            
+            self.mock_commit.assert_called_once()
+            mock_flash.assert_called_with('Successfully linked with patient. Waiting for access approval.', 'success')
+            self.assertEqual(response.status_code, 200)
+
+    def test_companion_patients_link_nonexistent_patient(self):
+        """Test linking with non-existent patient"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.CompanionLinkForm') as MockForm, \
+            patch('app.User.query') as mock_query, \
+            patch('app.flash') as mock_flash:
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.patient_email.data = 'nonexistent@test.com'
+            MockForm.return_value = mock_form
+            
+            # Patient not found
+            mock_query.filter_by.return_value.first.return_value = None
+            
+            response = self.client.post('/companion/patients', data={
+                'patient_email': 'nonexistent@test.com'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            mock_flash.assert_called_with('No patient account found with that email.', 'danger')
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_companion_patients_link_existing_connection(self):
+        """Test linking with already connected patient"""
+        self.mock_user.user_type = 'COMPANION'
+        self.mock_user.id = 1
+        
+        mock_patient = MagicMock(spec=User)
+        mock_patient.id = 2
+        mock_patient.email = 'patient@test.com'
+        mock_patient.user_type = 'PATIENT'
+        
+        with patch('app.CompanionLinkForm') as MockForm, \
+            patch('app.User.query') as mock_user_query, \
+            patch('app.CompanionAccess.query') as mock_access_query, \
+            patch('app.flash') as mock_flash:
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.patient_email.data = 'patient@test.com'
+            MockForm.return_value = mock_form
+            
+            # Setup query mocks
+            mock_user_query.filter_by.return_value.first.return_value = mock_patient
+            mock_access_query.filter_by.return_value.first.return_value = MagicMock()  # Existing link
+            
+            response = self.client.post('/companion/patients', data={
+                'patient_email': 'patient@test.com'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            mock_flash.assert_called_with('You are already linked with this patient.', 'warning')
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
+
+    def test_companion_patients_link_database_error(self):
+        """Test database error during patient linking"""
+        self.mock_user.user_type = 'COMPANION'
+        self.mock_user.id = 1
+        
+        mock_patient = MagicMock(spec=User)
+        mock_patient.id = 2
+        mock_patient.email = 'patient@test.com'
+        mock_patient.user_type = 'PATIENT'
+        
+        with patch('app.CompanionLinkForm') as MockForm, \
+            patch('app.User.query') as mock_user_query, \
+            patch('app.CompanionAccess.query') as mock_access_query, \
+            patch('app.flash') as mock_flash:
+            # Setup form mock
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = True
+            mock_form.patient_email.data = 'patient@test.com'
+            MockForm.return_value = mock_form
+            
+            # Setup query mocks
+            mock_user_query.filter_by.return_value.first.return_value = mock_patient
+            mock_access_query.filter_by.return_value.first.return_value = None
+            
+            # Force database error
+            self.mock_commit.side_effect = Exception("Database error")
+            
+            response = self.client.post('/companion/patients', data={
+                'patient_email': 'patient@test.com'
+            })
+            
+            self.assertEqual(response.status_code, 200)
+            self.mock_rollback.assert_called_once()
+            mock_flash.assert_called_with('An error occurred while linking with patient.', 'danger')
+            
+            # Reset the side effect
+            self.mock_commit.side_effect = None
+
+    def test_companion_patients_link_form_validation_error(self):
+        """Test form validation error during patient linking"""
+        self.mock_user.user_type = 'COMPANION'
+        
+        with patch('app.CompanionLinkForm') as MockForm:
+            # Setup form mock with validation error
+            mock_form = MagicMock()
+            mock_form.validate_on_submit.return_value = False
+            MockForm.return_value = mock_form
+            
+            response = self.client.post('/companion/patients', data={})
+            
+            self.assertEqual(response.status_code, 200)
+            self.mock_add.assert_not_called()
+            self.mock_commit.assert_not_called()
 
 
 if __name__ == '__main__':
