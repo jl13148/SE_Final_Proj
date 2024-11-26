@@ -7,7 +7,7 @@ from flask import url_for
 from flask_login import login_user, AnonymousUserMixin
 from werkzeug.exceptions import NotFound
 from django.db import IntegrityError
-from app import app, ExportPDFForm, ExportCSVForm, reset_db, init_db
+from app import app, ExportPDFForm, ExportCSVForm, reset_db, init_db, check_companion_access
 from models import db, User, Medication, GlucoseRecord, BloodPressureRecord, MedicationLog, UserType, AccessLevel, CompanionAccess
 import json
 import HtmlTestRunner
@@ -73,6 +73,43 @@ class HealthAppTestCase(unittest.TestCase):
         """
         with patch('flask_login.utils._get_user', return_value=self.mock_user):
             pass
+
+#----------------------------------------------------------------------------#
+# Decorators Tests
+#----------------------------------------------------------------------------#
+    def test_check_companion_access_no_patient_id(self):
+        """Test companion access decorator when no patient_id is provided"""
+        self.mock_user.user_type = UserType.COMPANION
+        
+        def test_endpoint():
+            @check_companion_access('glucose')
+            def protected():
+                return 'Access granted'
+            return protected()
+        
+        with self.app_context, \
+            app.test_request_context(path='/test'), \
+            patch('app.flash') as mock_flash:
+            
+            response = test_endpoint()
+            mock_flash.assert_called_with('Patient not specified.', 'danger')
+
+    def test_check_companion_access_non_companion_user(self):
+        """Test access decorator with non-companion user"""
+        self.mock_user.user_type = UserType.PATIENT
+        
+        def test_endpoint():
+            @check_companion_access('glucose')
+            def protected():
+                return 'Access granted'
+            return protected()
+        
+        with self.app_context, \
+            app.test_request_context(path='/test/1') as request_context:
+            
+            request_context.request.view_args = {'patient_id': '1'}
+            response = test_endpoint()
+            self.assertEqual(response, 'Access granted')
 
 #----------------------------------------------------------------------------#
 # Login and Register Tests
