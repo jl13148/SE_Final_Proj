@@ -66,7 +66,8 @@ class User(UserMixin, db.Model):
     # Relationships
     companions = db.relationship('CompanionAccess', foreign_keys='CompanionAccess.patient_id', backref='patient')
     patients = db.relationship('CompanionAccess', foreign_keys='CompanionAccess.companion_id', backref='companion')
-
+    notifications = db.relationship('Notification', back_populates='user')
+    
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
@@ -157,18 +158,36 @@ class MedicationLog(db.Model):
     # Remove the duplicate relationship definitions
     user = db.relationship('User', backref='medication_logs', lazy=True)
 
+class Notification(db.Model):
+    __tablename__ = 'notifications'
     
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    message = db.Column(db.String(255), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    is_read = db.Column(db.Boolean, default=False)
+
+    user = db.relationship('User', back_populates='notifications')
+
+    def __repr__(self):
+        return f'<Notification {self.message} to User {self.user_id}>'
+    
+class GlucoseType(Enum):
+    FASTING = "Fasting"
+    POSTPRANDIAL = "Postprandial"
+
 class GlucoseRecord(db.Model):
     __tablename__ = 'glucose_records'
     
     id = db.Column(db.Integer, primary_key=True)
     glucose_level = db.Column(db.Integer, nullable=False)
+    glucose_type = db.Column(SQLAlchemyEnum(GlucoseType), nullable=False)
     date = db.Column(db.String(10), nullable=False)
     time = db.Column(db.String(5), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
     def __repr__(self):
-        return f'<GlucoseRecord {self.glucose_level}>'
+        return f'<GlucoseRecord {self.glucose_level} mg/dL - {self.glucose_type.value}>'
 
 class BloodPressureRecord(db.Model):
     __tablename__ = 'blood_pressure_records'

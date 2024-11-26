@@ -11,6 +11,7 @@
                 <th>Date</th>
                 <th>Time</th>
                 <th>Glucose Level</th>
+                <th>Type</th>
                 <th>Actions</th>
             </tr>
         </thead>
@@ -20,6 +21,7 @@
                 <td>{{ record.date }}</td>
                 <td>{{ record.time }}</td>
                 <td>{{ record.glucose_level }}</td>
+                <td>{{ record.glucose_type.value }}</td>
                 <td>
                     <a href="{{ url_for('edit_glucose_record', id=record.id) }}" class="btn btn-info btn-sm">Edit</a>
                     <form action="{{ url_for('delete_glucose_record', id=record.id) }}" method="POST" style="display:inline;" onsubmit="return confirmDelete();">

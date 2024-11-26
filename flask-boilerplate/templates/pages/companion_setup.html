@@ -1,4 +1,3 @@
-# pages/companion_setup.html
 {% extends 'layouts/main.html' %}
 {% block title %}Link with Patient{% endblock %}
 
@@ -29,14 +28,16 @@
                                     <div class="invalid-feedback">{{ error }}</div>
                                 {% endfor %}
                             {% endif %}
-                            <small class="form-text text-muted">Enter the email address of the patient you want to connect with.</small>
                         </div>
-                        {{ form.submit(class="btn btn-primary") }}
+                        <button type="submit" class="btn btn-primary">Link Patient</button>
                     </form>
+                    
+                    <!-- Add a link to view notifications -->
+                    <hr>
+                    <a href="{{ url_for('view_notifications') }}" class="btn btn-info mt-3">View Notifications</a>
                 </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
-
