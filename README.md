@@ -1,4 +1,6 @@
 # SE_Final_Proj
+DiabetesEase
+![Coverage](.github/badges/coverage.svg)
 
 Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplate.git)
 
