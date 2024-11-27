@@ -114,7 +114,6 @@ def notify_companions(user_id, data_type, value):
     thresholds = {
         'fasting_glucose': {
             'valid_risky_low': 70,       # Hypoglycemia
-            'valid_normal_min': 70,
             'valid_normal_max': 99,
             'valid_risky_high': 180,     # Risky high
             'severe_hypo': 54,           # Severe hypoglycemia
@@ -153,13 +152,14 @@ def notify_companions(user_id, data_type, value):
         if glucose is not None:
             gt = thresholds[data_type]
             if data_type == 'fasting_glucose':
-                if gt['valid_risky_low'] <= glucose < gt['valid_normal_min']:
-                    is_risky = True
-                    messages.append(f"Fasting glucose level {glucose} mg/dL is in the hypoglycemia range.")
-            else:  # postprandial_glucose
-                if gt['valid_risky_low'] <= glucose < gt['valid_normal_max']:
-                    is_risky = True
-                    messages.append(f"Postprandial glucose level {glucose} mg/dL is in the hypoglycemia range.")
+                if data_type == 'fasting_glucose':
+                    if glucose < gt['valid_risky_low']:
+                        is_risky = True
+                        messages.append(f"Fasting glucose level {glucose} mg/dL is in the hypoglycemia range.")
+                else:  # postprandial_glucose
+                    if glucose < gt['valid_risky_low']:
+                        is_risky = True
+                        messages.append(f"Postprandial glucose level {glucose} mg/dL is in the hypoglycemia range.")
             
             if data_type == 'fasting_glucose' and gt['valid_normal_max'] < glucose <= gt['valid_risky_high']:
                 is_risky = True
