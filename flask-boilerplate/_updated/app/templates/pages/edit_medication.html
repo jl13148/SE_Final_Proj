@@ -1,0 +1,252 @@
+<!-- templates/pages/edit_medication.html -->
+{% extends 'layouts/main.html' %}
+{% block title %}Edit Medication - DiabetesEase{% endblock %}
+
+{% block content %}
+<div class="add-medication-container">
+    <div class="form-panel">
+        <div class="form-header">
+            <h1>Edit Item</h1>
+            <a href="{{ url_for('manage_medications') }}" class="close-btn">
+                <span class="close-icon">×</span>
+            </a>
+        </div>
+
+        <form method="POST" action="{{ url_for('edit_medication', id=medication.id) }}" class="medication-form">
+            {{ form.hidden_tag() }}
+            
+            <!-- Medication Name -->
+            <div class="form-field">
+                <div class="field-label">
+                    <span class="emoji">💊</span>
+                    Medication Name
+                </div>
+                {{ form.name(class="field-input", placeholder="Enter medication name", value=medication.name) }}
+                {% if form.name.errors %}
+                    {% for error in form.name.errors %}
+                        <span class="error-text">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- Dosage -->
+            <div class="form-field">
+                <div class="field-label">
+                    <span class="emoji">⚖️</span>
+                    Dosage
+                </div>
+                {{ form.dosage(class="field-input", placeholder="Enter dosage (e.g., 500mg)", value=medication.dosage) }}
+                {% if form.dosage.errors %}
+                    {% for error in form.dosage.errors %}
+                        <span class="error-text">{{ error }}</span>
+                    {% endfor %}
+                {% endif %}
+            </div>
+
+            <!-- Time Section -->
+            <div class="time-section">
+                <div class="time-header">
+                    <span class="emoji">⏰</span>
+                    Choose Time
+                </div>
+                
+                <div class="form-field">
+                    <div class="field-label">Intake Time</div>
+                    {{ form.time(class="field-input time-picker", value=medication.time.strftime('%H:%M')) }}
+                    {% if form.time.errors %}
+                        {% for error in form.time.errors %}
+                            <span class="error-text">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+                
+                <div class="form-field">
+                    <div class="field-label">
+                        <span class="emoji">📅</span>
+                        Frequency
+                    </div>
+                    {{ form.frequency(class="field-input", value=medication.frequency) }}
+                    {% if form.frequency.errors %}
+                        {% for error in form.frequency.errors %}
+                            <span class="error-text">{{ error }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="form-actions">
+                {{ form.submit(class="submit-btn", value="Update Medication") }}
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.add-medication-container {
+    min-height: calc(100vh - 160px);
+    padding: 1.5rem;  /* Reduced from 2rem */
+    background: linear-gradient(135deg, var(--primary-color) 0%, #ffffff 100%);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+}
+
+.form-panel {
+    background: white;
+    border-radius: 15px;  /* Reduced from 20px */
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 700px;  /* Reduced from 800px */
+    margin: 0 auto;
+    overflow: hidden;
+}
+
+.form-header {
+    background: #1cb3c7;
+    color: white;
+    padding: 1.2rem 1.5rem;  /* Reduced from 1.5rem 2rem */
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.form-header h1 {
+    margin: 0;
+    font-size: 1.5rem;  /* Reduced from 2rem */
+    font-weight: 600;
+}
+
+.close-btn {
+    text-decoration: none;
+    color: white;
+    display: flex;
+    align-items: center;
+    font-size: 1.2rem;  /* Reduced from 1.5rem */
+}
+
+.close-btn:hover {
+    color: #e0e9f5;
+    text-decoration: none;
+}
+
+.close-icon {
+    font-size: 2rem;  /* Reduced from 2.5rem */
+    font-weight: 300;
+}
+
+.medication-form {
+    padding: 2rem;  /* Reduced from 3rem */
+}
+
+.form-field {
+    margin-bottom: 1.5rem;  /* Reduced from 2rem */
+}
+
+.field-label {
+    font-size: 1rem;  /* Reduced from 1.2rem */
+    font-weight: 500;
+    color: #333;
+    margin-bottom: 0.75rem;  /* Reduced from 1rem */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.emoji {
+    font-size: 1.25rem;  /* Reduced from 1.5rem */
+}
+
+.field-input {
+    width: 100%;
+    padding: 0.75rem;  /* Reduced from 1rem */
+    border: 2px solid #e0e9f5;
+    border-radius: 8px;  /* Reduced from 12px */
+    font-size: 1rem;  /* Reduced from 1.1rem */
+    transition: all 0.3s ease;
+}
+
+.field-input:focus {
+    outline: none;
+    border-color: #1cb3c7;
+    box-shadow: 0 0 0 3px rgba(28, 179, 199, 0.1);
+}
+
+.time-section {
+    background: #f8f9fa;
+    border-radius: 12px;  /* Reduced from 15px */
+    padding: 1.5rem;  /* Reduced from 2rem */
+    margin: 1.5rem 0;  /* Reduced from 2rem */
+}
+
+.time-header {
+    font-size: 1.2rem;  /* Reduced from 1.4rem */
+    font-weight: 600;
+    color: #333;
+    margin-bottom: 1rem;  /* Reduced from 1.5rem */
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.time-picker {
+    font-size: 1rem;  /* Reduced from 1.2rem */
+    text-align: center;
+}
+
+select.field-input {
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 16 16'%3E%3Cpath fill='%23444' d='M8 12L2 6h12z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 1rem center;
+    padding-right: 2.5rem;  /* Reduced from 3rem */
+}
+
+.form-actions {
+    margin-top: 2rem;  /* Reduced from 3rem */
+    text-align: center;
+}
+
+.submit-btn {
+    background-color: #1cb3c7;
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;  /* Reduced from 1rem 3rem */
+    border-radius: 8px;  /* Reduced from 12px */
+    font-size: 1.1rem;  /* Reduced from 1.2rem */
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.submit-btn:hover {
+    background-color: #0159b6;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(28, 179, 199, 0.2);
+}
+
+.error-text {
+    color: #dc3545;
+    font-size: 0.9rem;
+    margin-top: 0.5rem;
+    display: block;
+}
+
+/* Animation for form appearance */
+.form-panel {
+    animation: slideDown 0.4s ease-out;  /* Reduced from 0.5s */
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
+{% endblock %}

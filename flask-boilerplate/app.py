@@ -90,14 +90,14 @@ def check_companion_access(access_type):
 # Updated Notification Function for Risky Ranges Only
 #----------------------------------------------------------------------------#
 
-app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')          # Replace with your mail server
-app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))                     # Replace with your mail port
-app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', '1', 't']
-app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')                        # Your email username
-app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')                        # Your email password
-app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')            # Your default sender email
+# app.config['MAIL_SERVER'] = os.environ.get('MAIL_SERVER', 'smtp.gmail.com')          # Replace with your mail server
+# app.config['MAIL_PORT'] = int(os.environ.get('MAIL_PORT', 587))                     # Replace with your mail port
+# app.config['MAIL_USE_TLS'] = os.environ.get('MAIL_USE_TLS', 'true').lower() in ['true', '1', 't']
+# app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME')                        # Your email username
+# app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')                        # Your email password
+# app.config['MAIL_DEFAULT_SENDER'] = os.environ.get('MAIL_DEFAULT_SENDER')            # Your default sender email
 
-mail = Mail(app)
+# mail = Mail(app)
 
 def notify_companions(user_id, data_type, value):
     """
@@ -222,17 +222,17 @@ def notify_companions(user_id, data_type, value):
                 db.session.add(notification)
 
                 # Email Notification
-                if companion_user.email:
-                    try:
-                        msg = Message(
-                            subject="Health Alert Notification",
-                            recipients=[companion_user.email],
-                            body=f"Dear {companion_user.username},\n\n{message}\n\nBest regards,\nDiabetesEase Team"
-                        )
-                        mail.send(msg)
-                    except Exception as e:
-                        # Log the exception or handle it as needed
-                        app.logger.error(f"Failed to send email to {companion_user.email}: {e}")
+                # if companion_user.email:
+                #     try:
+                #         msg = Message(
+                #             subject="Health Alert Notification",
+                #             recipients=[companion_user.email],
+                #             body=f"Dear {companion_user.username},\n\n{message}\n\nBest regards,\nDiabetesEase Team"
+                #         )
+                #         mail.send(msg)
+                #     except Exception as e:
+                #         # Log the exception or handle it as needed
+                #         app.logger.error(f"Failed to send email to {companion_user.email}: {e}")
 
         db.session.commit()
 
