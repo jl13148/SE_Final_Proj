@@ -1,23 +1,23 @@
-import logging
+from flask import Flask
+from .extensions import db, migrate, login_manager
+from .models import User  # Ensure User model is imported
+from .controllers.pages import blueprint
 
-from flask import Flask, request as req
-
-from app.controllers import pages
-
-
-def create_app(config_filename):
+def create_app(config_class='config.Config'):
     app = Flask(__name__)
-    app.config.from_object(config_filename)
-
-    app.register_blueprint(pages.blueprint)
-
-    app.logger.setLevel(logging.NOTSET)
-
-    @app.after_request
-    def log_response(resp):
-        app.logger.info("{} {} {}\n{}".format(
-            req.method, req.url, req.data, resp)
-        )
-        return resp
-
+    app.config.from_object(config_class)
+    
+    # Initialize extensions
+    db.init_app(app)
+    migrate.init_app(app, db)
+    login_manager.init_app(app)
+    
+    # Register Blueprints
+    app.register_blueprint(blueprint)
+    
+    # Configure Flask-Login
+    @login_manager.user_loader
+    def load_user(user_id):
+        return User.query.get(int(user_id))
+    
     return app
