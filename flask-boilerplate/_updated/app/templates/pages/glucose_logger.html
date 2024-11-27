@@ -14,7 +14,7 @@
 <body>
     <div class="container py-5">
         <h1 class="mb-4">Record Glucose Level</h1>
-        <form method="POST" action="{{ url_for('record_glucose') }}">
+        <form method="POST" action="{{ url_for('health.record_glucose') }}">
             <div class="form-group">
                 <label for="glucose_level">Glucose Level (mg/dL)</label>
                 <input type="number" class="form-control" id="glucose_level" name="glucose_level" required>

@@ -1,10 +1,255 @@
 {% extends 'layouts/main.html' %}
-{% block title %}Home{% endblock %}
+{% block page_title %}DiabetesEase - Smart Diabetes Management{% endblock %}
+
 {% block content %}
-
-<div class="page-header">
-  <h1>Sticky footer with fixed navbar</h1>
+<!-- Hero Section with Wave -->
+<div class="hero-section position-relative overflow-hidden">
+    <div class="container py-5">
+        <div class="row align-items-center">
+            <div class="col-lg-6">
+                <img src="{{ url_for('static', filename='img/logo.png') }}" alt="DiabetesEase" class="mb-4" style="height: 50px;">
+                <h1 class="display-4 text-white fw-bold mb-3 animate-text">Take Control of Your Diabetes</h1>
+                <p class="lead text-white mb-4">Simple, smart, and secure diabetes management at your fingertips.</p>
+            </div>
+            <div class="col-lg-6 text-center">
+                <div class="floating-animation">
+                    <img src="{{ url_for('static', filename='img/Diabetes.png') }}" alt="Diabetes Management" class="img-fluid">
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="wave-bottom">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 320">
+            <path fill="#ffffff" fill-opacity="1" d="M0,96L48,112C96,128,192,160,288,160C384,160,480,128,576,112C672,96,768,96,864,112C960,128,1056,160,1152,160C1248,160,1344,128,1392,112L1440,96L1440,320L1392,320C1344,320,1248,320,1152,320C1056,320,960,320,864,320C768,320,672,320,576,320C480,320,384,320,288,320C192,320,96,320,48,320L0,320Z"></path>
+        </svg>
+    </div>
 </div>
-<p class="lead">Pin a fixed-height footer to the bottom of the viewport in desktop browsers with this custom HTML and CSS. A fixed navbar has been added within <code>#wrap</code> with <code>padding-top: 60px;</code> on the <code>.container</code>.</p>
 
+<!-- Features Section -->
+<div class="features-section py-5">
+    <div class="container">
+        <div class="row g-4">
+            <!-- Medication Scheduler -->
+            <div class="col-md-4">
+                <a href="{{ url_for('medication.medications') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-pills"></i>
+                        </div>
+                        <h3>Medication Scheduler</h3>
+                        <p>Never miss a dose with smart reminders and easy medication tracking.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> Custom schedules</li>
+                            <li><span class="check-icon">✓</span> Timely reminders</li>
+                            <li><span class="check-icon">✓</span> Medication history</li>
+                        </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Health Logger -->
+            <div class="col-md-4">
+                <a href="{{ url_for('health.health_logger') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <h3>Health Logger</h3>
+                        <p>Track your glucose levels and health metrics with ease.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> Glucose tracking</li>
+                            <li><span class="check-icon">✓</span> Blood pressure log</li>
+                            <li><span class="check-icon">✓</span> Visual insights</li>
+                        </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+
+            <!-- Health Reports -->
+            <div class="col-md-4">
+                <a href="{{ url_for('report.health_reports') }}" class="feature-card-link">
+                    <div class="feature-card">
+                        <div class="icon-wrapper">
+                            <i class="fas fa-file-export"></i>
+                        </div>
+                        <h3>Health Reports</h3>
+                        <p>Share your health data with healthcare providers instantly.</p>
+                        <ul class="feature-list">
+                            <li><span class="check-icon">✓</span> PDF reports</li>
+                            <li><span class="check-icon">✓</span> CSV export</li>
+                            <li><span class="check-icon">✓</span> Secure sharing</li>
+                        </ul>
+                        <div class="card-arrow">
+                            <i class="fas fa-arrow-right"></i>
+                        </div>
+                    </div>
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- CTA Section -->
+<div class="cta-section text-center py-5">
+    <div class="container">
+        <h2 class="mb-4">Ready to Manage Your Diabetes Better?</h2>
+        {% if not current_user.is_authenticated %}
+            <a href="{{ url_for('pages.register') }}" class="btn btn-primary btn-lg pulse-button">Start Free Today</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+:root {
+    --primary-color: #e0e9f5;
+    --primary-dark: #1cb3c7;
+    --icon: #8ed8e2;
+    --accent-color: #28a745;
+    --text-color: #444343;
+    --light-bg: #f8f9fa;
+}
+
+/* New styles for clickable cards */
+.feature-card-link {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    height: 100%;
+    position: relative;
+}
+
+.feature-card-link:hover {
+    text-decoration: none;
+    color: inherit;
+}
+
+.feature-card {
+    position: relative;
+    overflow: hidden;
+    background: white;
+    border-radius: 15px;
+    padding: 2rem;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    transition: all 0.3s ease;
+    height: 100%;
+}
+
+.card-arrow {
+    position: absolute;
+    bottom: 1.5rem;
+    right: 1.5rem;
+    opacity: 0;
+    transform: translateX(-10px);
+    transition: all 0.3s ease;
+    color: var(--primary-dark);
+}
+
+.feature-card-link:hover .card-arrow {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.feature-card-link:hover .feature-card {
+    border-color: var(--primary-dark);
+}
+
+/* Hero Section */
+.hero-section {
+    background: linear-gradient(135deg, var(--primary-dark) 0%, var(--primary-color) 100%);
+    padding-bottom: 100px;
+}
+
+.wave-bottom {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    overflow: hidden;
+    line-height: 0;
+}
+
+.floating-animation {
+    animation: float 6s ease-in-out infinite;
+}
+
+@keyframes float {
+    0% { transform: translateY(0px); }
+    50% { transform: translateY(-20px); }
+    100% { transform: translateY(0px); }
+}
+
+/* Hover Effects */
+.feature-card:hover {
+    transform: translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.15);
+}
+
+.icon-wrapper {
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: var(--icon);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+}
+
+.icon-wrapper i {
+    font-size: 2rem;
+    color: white;
+}
+
+.feature-list {
+    list-style: none;
+    padding: 0;
+    margin: 1.5rem 0 0;
+}
+
+.feature-list li {
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+}
+
+.check-icon {
+    color: var(--accent-color);
+    margin-right: 0.5rem;
+    font-weight: bold;
+}
+
+.pulse-button {
+    position: relative;
+    transition: all 0.3s ease;
+}
+
+.pulse-button:hover {
+    transform: scale(1.05);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+}
+
+.animate-text {
+    opacity: 0;
+    animation: fadeInUp 1s ease forwards;
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+</style>
 {% endblock %}

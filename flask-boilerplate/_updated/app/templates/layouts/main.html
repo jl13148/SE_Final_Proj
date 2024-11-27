@@ -40,7 +40,7 @@
                     </li>
                     {% if current_user.is_authenticated %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('pages.medications') }}">Medications</a>
+                            <a class="nav-link" href="{{ url_for('medication.medications') }}">Medications</a>
                         </li>
                         <li class="nav-item dropdown">
                             <a class="nav-link dropdown-toggle" href="#" id="healthDropdown" role="button" 
@@ -48,16 +48,16 @@
                                 Health Logger
                             </a>
                             <div class="dropdown-menu" aria-labelledby="healthDropdown">
-                                <a class="dropdown-item" href="{{ url_for('pages.glucose_records') }}">Glucose Records</a>
-                                <a class="dropdown-item" href="{{ url_for('pages.blood_pressure_records') }}">Blood Pressure Records</a>
+                                <a class="dropdown-item" href="{{ url_for('health.glucose_records') }}">Glucose Records</a>
+                                <a class="dropdown-item" href="{{ url_for('health.blood_pressure_records') }}">Blood Pressure Records</a>
                             </div>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('pages.health_reports') }}">Export Data</a>
+                            <a class="nav-link" href="{{ url_for('report.health_reports') }}">Export Data</a>
                         </li>
                         {% if current_user.user_type == "PATIENT" %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('pages.manage_connections') }}">
+                                <a class="nav-link" href="{{ url_for('connection.manage_connections') }}">
                                     Connections
                                     {% if pending_connections_count > 0 %}
                                         <span class="badge badge-danger">{{ pending_connections_count }}</span>
@@ -88,15 +88,15 @@
                                 {% endif %}
                             </a>
                             <div class="dropdown-menu dropdown-menu-right" aria-labelledby="userDropdown">
-                                <a class="dropdown-item" href="{{ url_for('pages.logout') }}">Logout</a>
+                                <a class="dropdown-item" href="{{ url_for('auth.logout') }}">Logout</a>
                             </div>
                         </li>
                     {% else %}
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('pages.login') }}">Login</a>
+                            <a class="nav-link" href="{{ url_for('auth.login') }}">Login</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('pages.register') }}">Register</a>
+                            <a class="nav-link" href="{{ url_for('auth.register') }}">Register</a>
                         </li>
                     {% endif %}
                 </ul>

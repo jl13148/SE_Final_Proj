@@ -20,7 +20,7 @@
         <div class="tab-pane fade show active p-4" id="pdf" role="tabpanel" aria-labelledby="pdf-tab">
             <h3>Download PDF Report</h3>
             <p>Click the button below to download your health data in PDF format.</p>
-            <form action="{{ url_for('export_pdf') }}" method="post">
+            <form action="{{ url_for('report.export_pdf') }}" method="post">
                 <!-- Add CSRF token here if using Flask-WTF -->
                 <button type="submit" class="btn btn-primary">Download PDF</button>
             </form>
@@ -28,7 +28,7 @@
         <div class="tab-pane fade p-4" id="csv" role="tabpanel" aria-labelledby="csv-tab">
             <h3>Download CSV Report</h3>
             <p>Click the button below to download your health data in CSV format.</p>
-            <form action="{{ url_for('export_csv') }}" method="post">
+            <form action="{{ url_for('report.export_csv') }}" method="post">
                 <!-- Add CSRF token here if using Flask-WTF -->
                 <button type="submit" class="btn btn-success">Download CSV</button>
             </form>

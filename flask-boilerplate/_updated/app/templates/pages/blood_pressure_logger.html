@@ -15,7 +15,7 @@
 <body>
     <div class="container py-5">
         <h1 class="mb-4">Record Blood Pressure</h1>
-        <form method="POST" action="{{ url_for('record_blood_pressure') }}">
+        <form method="POST" action="{{ url_for('health.record_blood_pressure') }}">
             <div class="form-group">
                 <label for="systolic">Systolic (mm Hg)</label>
                 <input type="number" class="form-control" id="systolic" name="systolic" required>
