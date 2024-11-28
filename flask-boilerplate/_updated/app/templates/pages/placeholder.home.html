@@ -100,7 +100,7 @@
     <div class="container">
         <h2 class="mb-4">Ready to Manage Your Diabetes Better?</h2>
         {% if not current_user.is_authenticated %}
-            <a href="{{ url_for('pages.register') }}" class="btn btn-primary btn-lg pulse-button">Start Free Today</a>
+            <a href="{{ url_for('auth.register') }}" class="btn btn-primary btn-lg pulse-button">Start Free Today</a>
         {% endif %}
     </div>
 </div>
