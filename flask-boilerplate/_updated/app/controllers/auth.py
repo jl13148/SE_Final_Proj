@@ -64,7 +64,7 @@ def register():
 def logout():
     logout_user()
     flash('You have been logged out.', 'info')
-    return redirect(url_for('home'))
+    return redirect(url_for('pages.home'))
 
 @auth.route('/forgot', methods=['GET', 'POST'])
 def forgot():

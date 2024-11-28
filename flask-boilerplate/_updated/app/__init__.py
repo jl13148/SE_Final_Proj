@@ -10,17 +10,25 @@ from .controllers.pages import pages as pages_blueprint
 from .controllers.report import report as report_blueprint
 from .controllers.connection import connection as connection_blueprint
 from .models import CompanionAccess
+from config import get_config
 
-def create_app(config_class='config.Config'):
+
+def create_app(config_name=None):
     app = Flask(__name__)
-    app.config.from_object(config_class)
+    
+    # Get configuration class
+    config = get_config(config_name)
+    app.config.from_object(config)
     
     # Initialize extensions
     db.init_app(app)
-    migrate.init_app(app, db)
     login_manager.init_app(app)
+    migrate.init_app(app, db)
     
-    # Register Blueprints
+    # Set up login manager
+    login_manager.login_view = 'auth.login'
+    login_manager.login_message_category = 'info'
+    
     app.register_blueprint(auth_blueprint)
     app.register_blueprint(health_blueprint)
     app.register_blueprint(medication_blueprint)
