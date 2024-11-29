@@ -14,13 +14,13 @@
         <p>Click the button below to export your health data in CSV format.</p>
 
         <!-- Export CSV Form -->
-        <form action="{{ url_for('export_csv') }}" method="post">
+        <form action="{{ url_for('report.export_csv') }}" method="post">
             <button type="submit" class="btn btn-primary">Export Data</button>
         </form>
 
         <!-- Link to download the generated CSV report -->
         <div class="mt-4">
-            <a href="{{ url_for('download_csv_direct') }}">
+            <a href="{{ url_for('report.download_csv_direct') }}">
                 <button class="btn btn-success">Download CSV</button>
             </a>
         </div>

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>Edit Glucose Record</h2>
-    <form method="POST" action="{{ url_for('edit_glucose_record', id=record.id) }}">
+    <form method="POST" action="{{ url_for('health.edit_glucose_record', id=record.id) }}">
         <div class="form-group">
             <label for="glucose_level">Glucose Level (mg/dL)</label>
             <input type="number" class="form-control" id="glucose_level" name="glucose_level" value="{{ record.glucose_level }}" required>
@@ -18,7 +18,7 @@
             <input type="time" class="form-control" id="time" name="time" value="{{ record.time }}" required>
         </div>
         <button type="submit" class="btn btn-primary mt-3">Update Record</button>
-        <a href="{{ url_for('glucose_logger') }}" class="btn btn-secondary mt-3">Cancel</a>
+        <a href="{{ url_for('health.glucose_logger') }}" class="btn btn-secondary mt-3">Cancel</a>
     </form>
 </div>
 {% endblock %}

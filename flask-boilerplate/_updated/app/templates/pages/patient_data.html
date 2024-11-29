@@ -49,7 +49,7 @@
                                             <td>{{ med.time.strftime('%I:%M %p') }}</td>
                                             {% if access.medication_access == "EDIT" %}
                                                 <td>
-                                                    <a href="{{ url_for('edit_medication', id=med.id) }}" 
+                                                    <a href="{{ url_for('medication.edit_medication', id=med.id) }}" 
                                                        class="btn btn-sm btn-primary">Edit</a>
                                                 </td>
                                             {% endif %}
@@ -96,7 +96,7 @@
                                             <td>{{ record.glucose_level }}</td>
                                             {% if access.glucose_access == "EDIT" %}
                                                 <td>
-                                                    <a href="{{ url_for('edit_glucose_record', id=record.id) }}" 
+                                                    <a href="{{ url_for('health.edit_glucose_record', id=record.id) }}" 
                                                        class="btn btn-sm btn-primary">Edit</a>
                                                 </td>
                                             {% endif %}
@@ -145,7 +145,7 @@
                                             <td>{{ record.diastolic }}</td>
                                             {% if access.blood_pressure_access == "EDIT" %}
                                                 <td>
-                                                    <a href="{{ url_for('edit_blood_pressure_record', id=record.id) }}" 
+                                                    <a href="{{ url_for('health.edit_blood_pressure_record', id=record.id) }}" 
                                                        class="btn btn-sm btn-primary">Edit</a>
                                                 </td>
                                             {% endif %}
@@ -169,12 +169,12 @@
                 </div>
                 <div class="card-body">
                     <div class="d-flex gap-2">
-                        <form action="{{ url_for('export_pdf') }}" method="POST" class="d-inline">
+                        <form action="{{ url_for('report.export_pdf') }}" method="POST" class="d-inline">
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-file-pdf"></i> Export as PDF
                             </button>
                         </form>
-                        <form action="{{ url_for('export_csv') }}" method="POST" class="d-inline">
+                        <form action="{{ url_for('report.export_csv') }}" method="POST" class="d-inline">
                             <button type="submit" class="btn btn-primary">
                                 <i class="fas fa-file-csv"></i> Export as CSV
                             </button>
