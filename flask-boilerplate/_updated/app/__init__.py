@@ -9,6 +9,7 @@ from .controllers.medication import medication as medication_blueprint
 from .controllers.pages import pages as pages_blueprint
 from .controllers.report import report as report_blueprint
 from .controllers.connection import connection as connection_blueprint
+from .controllers.companion import companion as companion_blueprint
 from .models import CompanionAccess
 from config import get_config
 
@@ -35,6 +36,7 @@ def create_app(config_name=None):
     app.register_blueprint(pages_blueprint)
     app.register_blueprint(report_blueprint)
     app.register_blueprint(connection_blueprint)
+    app.register_blueprint(companion_blueprint)
 
     @app.context_processor
     def utility_processor():

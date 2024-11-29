@@ -36,13 +36,13 @@
                                         <i class="fas fa-envelope"></i> {{ connection.companion.email }}
                                     </p>
                                     <div class="d-flex justify-content-between">
-                                        <form action="{{ url_for('approve_connection', connection_id=connection.id) }}" 
+                                        <form action="{{ url_for('connection.approve_connection', connection_id=connection.id) }}" 
                                               method="POST" class="d-inline">
                                             <button type="submit" class="btn btn-success">
                                                 <i class="fas fa-check"></i> Accept
                                             </button>
                                         </form>
-                                        <form action="{{ url_for('reject_connection', connection_id=connection.id) }}" 
+                                        <form action="{{ url_for('connection.reject_connection', connection_id=connection.id) }}" 
                                               method="POST" class="d-inline">
                                             <button type="submit" class="btn btn-danger" 
                                                     onclick="return confirm('Are you sure you want to decline this request?')">
@@ -94,7 +94,7 @@
                                     </ul>
                                     
                                     <div class="mt-3">
-                                        <a href="{{ url_for('update_access', connection_id=connection.id) }}" 
+                                        <a href="{{ url_for('connection.update_access', connection_id=connection.id) }}" 
                                            class="btn btn-primary btn-sm">
                                             Modify Access
                                         </a>
@@ -104,7 +104,7 @@
                                             Remove
                                         </button>
                                         <form id="remove-form-{{ connection.id }}" 
-                                              action="{{ url_for('remove_connection', connection_id=connection.id) }}" 
+                                              action="{{ url_for('connection.remove_connection', connection_id=connection.id) }}" 
                                               method="POST" style="display: none;">
                                         </form>
                                     </div>

@@ -12,7 +12,7 @@ def manage_connections():
     if current_user.user_type != "PATIENT":
     # if not current_user.is_patient():
         flash('Only patients can manage connections.', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('pages.home'))
     
     # Get pending connections (where all access levels are NONE)
     # pending_connections = CompanionAccess.query.filter_by(
@@ -52,12 +52,12 @@ def manage_connections():
 def approve_connection(connection_id):
     if current_user.user_type != "PATIENT":
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('pages.home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('manage_connections'))
+        return redirect(url_for('connection.manage_connections'))
         
     try:
         # Set initial access levels to NONE
@@ -69,12 +69,12 @@ def approve_connection(connection_id):
         db.session.commit()
         flash(f'Connection approved. Please set access levels for {connection.companion.username}.', 'success')
         # Redirect to access setting page
-        return redirect(url_for('update_access', connection_id=connection.id))
+        return redirect(url_for('connection.update_access', connection_id=connection.id))
     except Exception as e:
         db.session.rollback()
         flash('Error approving connection.', 'danger')
         
-    return redirect(url_for('manage_connections'))
+    return redirect(url_for('connection.manage_connections'))
 
 @connection.route('/connections/<int:connection_id>/reject', methods=['POST'])
 @login_required
@@ -94,19 +94,19 @@ def reject_connection(connection_id):
         db.session.rollback()
         flash('Error rejecting connection.', 'danger')
         
-    return redirect(url_for('manage_connections'))
+    return redirect(url_for('connection.manage_connections'))
 
 @connection.route('/connections/<int:connection_id>/access', methods=['GET', 'POST'])
 @login_required
 def update_access(connection_id):
     if current_user.user_type != "PATIENT":
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('pages.home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('manage_connections'))
+        return redirect(url_for('connection.manage_connections'))
     
     if request.method == 'GET':
         # Clear any existing messages when loading the form
@@ -148,19 +148,19 @@ def update_access(connection_id):
             flash(f'Error updating access levels: {str(e)}', 'danger')
             return render_template('pages/companion_access.html', access=connection)
             
-    return redirect(url_for('manage_connections'))
+    return redirect(url_for('connection.manage_connections'))
 
 @connection.route('/connections/<int:connection_id>/remove', methods=['POST'])
 @login_required
 def remove_connection(connection_id):
     if current_user.user_type != "PATIENT":
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('home'))
+        return redirect(url_for('pages.home'))
         
     connection = CompanionAccess.query.get_or_404(connection_id)
     if connection.patient_id != current_user.id:
         flash('Unauthorized access.', 'danger')
-        return redirect(url_for('manage_connections'))
+        return redirect(url_for('connection.manage_connections'))
         
     try:
         db.session.delete(connection)
@@ -175,4 +175,4 @@ def remove_connection(connection_id):
                              if message != 'Error removing connection.']
         flash('Error removing connection.', 'danger')
         
-    return redirect(url_for('manage_connections'))
+    return redirect(url_for('connection.manage_connections'))

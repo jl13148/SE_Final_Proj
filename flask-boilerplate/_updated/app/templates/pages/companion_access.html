@@ -10,7 +10,7 @@
                     <h4 class="mb-0">Manage Access for {{ access.companion.username }}</h4>
                 </div>
                 <div class="card-body">
-                    <form method="POST" action="{{ url_for('update_access', connection_id=access.id) }}">
+                    <form method="POST" action="{{ url_for('connection.update_access', connection_id=access.id) }}">
                         <div class="form-group mb-3">
                             <label class="form-label">Medication Records Access</label>
                             <select name="medication_access" class="form-select">
@@ -49,7 +49,7 @@
                         
                         <div class="d-flex justify-content-between mt-4">
                             <button type="submit" class="btn btn-primary">Update Access Settings</button>
-                            <a href="{{ url_for('manage_connections') }}" class="btn btn-secondary">Back to Connections</a>
+                            <a href="{{ url_for('connection.manage_connections') }}" class="btn btn-secondary">Back to Connections</a>
                             <button type="button" class="btn btn-danger"
                                     onclick="if(confirm('Are you sure you want to remove this companion? This action cannot be undone.')) document.getElementById('remove-form').submit()">
                                 Remove Companion
@@ -59,7 +59,7 @@
 
                     <!-- Hidden form for companion removal -->
                     <form id="remove-form" 
-                          action="{{ url_for('remove_connection', connection_id=access.id) }}" 
+                          action="{{ url_for('connection.remove_connection', connection_id=access.id) }}" 
                           method="POST" style="display: none;">
                     </form>
                 </div>

@@ -67,10 +67,10 @@
                         {% endif %}
                         {% if current_user.user_type == "COMPANION" %}
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('pages.companion_patients') }}">My Patients</a>
+                                <a class="nav-link" href="{{ url_for('companion.companion_patients') }}">My Patients</a>
                             </li>
                             <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('pages.view_notifications') }}">Notifications</a>
+                                <a class="nav-link" href="{{ url_for('companion.view_notifications') }}">Notifications</a>
                             </li>
                         {% endif %}
                     {% endif %}
