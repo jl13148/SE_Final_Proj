@@ -8,22 +8,25 @@ class Config:
     SECRET_KEY = 'my precious'
     SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(ROOT_DIR, 'database.db')
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-
-class DevelopmentConfig(Config):
-    DEBUG = True
-    # Database path specifically for development
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(ROOT_DIR, 'dev_database.db')
+    STATIC_FOLDER = 'static'
+    STATIC_URL_PATH = '/static'
+    TEMPLATE_FOLDER = 'templates'
 
 class TestingConfig(Config):
     TESTING = True
     SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False
+    DEBUG = False
+
+class DevelopmentConfig(Config):
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(ROOT_DIR, 'dev_database.db')
 
 class ProductionConfig(Config):
-    # Production-specific settings
     pass
 
-# Map config names to config classes
-config = {
+# Dictionary mapping config names to config classes
+CONFIG = {
     'development': DevelopmentConfig,
     'testing': TestingConfig,
     'production': ProductionConfig,
@@ -34,4 +37,4 @@ def get_config(config_name=None):
     """Helper function to get configuration class"""
     if config_name is None:
         config_name = os.environ.get('FLASK_CONFIG', 'default')
-    return config.get(config_name, config['default'])
+    return CONFIG.get(config_name, CONFIG['default'])

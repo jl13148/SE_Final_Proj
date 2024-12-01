@@ -1,10 +1,14 @@
 from flask import Blueprint, render_template, redirect, url_for, request, flash
-from flask_login import login_user, current_user, login_required, logout_user
-from app.models import User, CompanionAccess, GlucoseRecord, BloodPressureRecord, Medication
-from app.forms import LoginForm, RegisterForm, ForgotForm, CompanionLinkForm
+from flask_login import login_user, current_user, logout_user
+from app.forms import LoginForm, RegisterForm, ForgotForm
+from app.services.auth_service import AuthService
 from app.extensions import db
 
+# Create blueprint
 auth = Blueprint('auth', __name__)
+
+# Initialize service
+auth_service = AuthService(db)
 
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
@@ -13,20 +17,26 @@ def login():
     
     form = LoginForm()
     if form.validate_on_submit():
-        user = User.query.filter_by(email=form.email.data, user_type=form.user_type.data).first()
+        success, user, redirect_url, error = auth_service.authenticate_user(
+            email=form.email.data,
+            password=form.password.data,
+            user_type=form.user_type.data
+        )
         
-        if user and user.check_password(form.password.data):
+        if success:
             login_user(user, remember=form.remember.data)
-            next_page = request.args.get('next')
             
-            if user.user_type == 'companion':
-                if not user.patients:
-                    return redirect(url_for('companion.companion_setup'))
-                    
+            # Handle specific redirect for companions
+            if redirect_url:
+                return redirect(url_for(redirect_url))
+                
+            # Handle next page redirect
+            next_page = request.args.get('next')
             flash('Login successful!', 'success')
             return redirect(next_page) if next_page else redirect(url_for('pages.home'))
-        else:
-            flash('Login unsuccessful. Please check email, password and account type.', 'danger')
+        
+        flash(error, 'danger')
+    
     return render_template('forms/login.html', form=form)
 
 @auth.route('/register', methods=['GET', 'POST'])
@@ -36,28 +46,25 @@ def register():
     
     form = RegisterForm()
     if form.validate_on_submit():
-        user = User(
+        success, user, redirect_url, error = auth_service.register_user(
             username=form.username.data,
             email=form.email.data,
+            password=form.password.data,
             user_type=form.user_type.data
         )
-        user.set_password(form.password.data)
         
-        try:
-            db.session.add(user)
-            db.session.commit()
-            
+        if success:
             flash('Your account has been created! You can now log in.', 'success')
+            
+            # Handle companion registration
             if form.user_type.data == 'COMPANION':
                 login_user(user)
-                return redirect(url_for('companion.companion_setup'))
-            return redirect(url_for('auth.login'))
-            
-        except Exception as e:
-            db.session.rollback()
-            flash('An error occurred. Please try again.', 'danger')
-            return render_template('forms/register.html', form=form)
-            
+                return redirect(url_for(redirect_url))
+                
+            return redirect(url_for(redirect_url))
+        
+        flash(error, 'danger')
+    
     return render_template('forms/register.html', form=form)
 
 @auth.route('/logout')
@@ -70,8 +77,12 @@ def logout():
 def forgot():
     form = ForgotForm()
     if form.validate_on_submit():
-        # Implement password reset functionality here
-        flash('Password reset functionality not yet implemented.', 'info')
-        return redirect(url_for('login'))
+        success, error = auth_service.initiate_password_reset(form.email.data)
+        
+        if success:
+            flash('Password reset instructions have been sent to your email.', 'info')
+            return redirect(url_for('auth.login'))
+        
+        flash(error, 'danger')
+        
     return render_template('forms/forgot.html', form=form)
-

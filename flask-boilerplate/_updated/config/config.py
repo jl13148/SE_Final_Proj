@@ -25,3 +25,9 @@ class Config:
     STATIC_FOLDER = 'static'
     STATIC_URL_PATH = '/static'
     TEMPLATE_FOLDER = 'templates'
+
+class TestConfig(Config):
+    TESTING = True
+    SQLALCHEMY_DATABASE_URI = 'sqlite:///:memory:'
+    WTF_CSRF_ENABLED = False
+    DEBUG = False
