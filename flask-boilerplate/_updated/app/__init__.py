@@ -17,8 +17,8 @@ from .services.auth_service import AuthService
 from .services.health_service import HealthService
 from .services.medication_service import MedicationService
 # from .services.report_service import ReportService
-# from .services.notification_service import NotificationService
-# from .services.companion_service import CompanionService
+from .services.connection_service import ConnectionService
+from .services.companion_service import CompanionService
 
 from config import get_config
 
@@ -45,8 +45,8 @@ def create_app(config_name=None):
         app.health_service = HealthService(db)
         app.medication_service = MedicationService(db)
         # app.report_service = ReportService(db)
-        # app.notification_service = NotificationService(db)
-        # app.companion_service = CompanionService(db)
+        app.connection_service = ConnectionService(db)
+        app.companion_service = CompanionService(db)
 
     # Register blueprints
     app.register_blueprint(auth_blueprint)
