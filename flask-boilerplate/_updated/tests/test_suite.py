@@ -8,11 +8,20 @@ def run_tests_with_coverage():
     # Start coverage
     cov = coverage.Coverage(
         branch=True,
-        include=['app/*'],
-        omit=['tests/*', 'app/templates/*']
+        include=[
+            'app/*',
+            'app/controllers/*',
+            'app/services/*',
+            'app/models/*'
+        ],
+        omit=[
+            'tests/*', 
+            'app/templates/*',
+            'app/static/*'
+        ]
     )
     cov.start()
-
+    
     # Create test suite
     loader = unittest.TestLoader()
     start_dir = os.path.dirname(os.path.abspath(__file__))
@@ -29,6 +38,19 @@ def run_tests_with_coverage():
     # Print coverage report
     print('\nCoverage Summary:')
     cov.report()
+
+    # Generate HTML report
+    html_report_dir = os.path.join(start_dir, 'htmlcov')
+    cov.html_report(directory=html_report_dir)
+    print(f'\nHTML coverage report generated in: {html_report_dir}')
+    
+    # Try to open the report in browser
+    try:
+        index_path = os.path.join(html_report_dir, 'index.html')
+        webbrowser.open('file://' + os.path.abspath(index_path))
+    except:
+        print("Could not automatically open the report in browser.")
+        print(f"Please open {index_path} in your browser to view the detailed report.")
 
     # Generate XML report for CI
     cov.xml_report()
