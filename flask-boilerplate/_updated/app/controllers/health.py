@@ -1,13 +1,222 @@
-from flask import Blueprint, render_template, redirect, url_for, request, flash
+from flask import Blueprint, render_template, redirect, url_for, request, flash, current_app
 from flask_login import login_required, current_user
-from app.forms import ExportPDFForm, ExportCSVForm
-from app.models import GlucoseRecord, BloodPressureRecord, GlucoseType, CompanionAccess, Notification, User
+from app.models import GlucoseType
+from app.models import GlucoseRecord, BloodPressureRecord, CompanionAccess, User, Notification
 from app.extensions import db
 
+health = Blueprint('health', __name__)
 
-#-----------Helper functions----------------
-def is_duplicate_record(model, user_id, date_str, time_str):
-    return model.query.filter_by(user_id=user_id, date=date_str, time=time_str).first() is not None
+@health.route('/health-logger')
+@login_required
+def health_logger():
+    return render_template('pages/health_logger.html')
+
+@health.route('/glucose/logger', methods=['GET', 'POST'])
+@login_required
+def glucose_logger():
+    """
+    Route for adding a new glucose record.
+    """
+    if request.method == 'POST':
+        health_service = current_app.health_service
+        try:
+            glucose_level = int(request.form['glucose_level'])
+            glucose_type = request.form['glucose_type']
+            date = request.form['date']
+            time = request.form['time']
+        except (ValueError, KeyError):
+            flash('Invalid input. Please check your entries.', 'danger')
+            return render_template('pages/glucose_logger.html')
+
+        success, record, error = health_service.add_glucose_record(
+            user_id=current_user.id,
+            glucose_level=glucose_level,
+            glucose_type=glucose_type,
+            date=date,
+            time=time
+        )
+
+        if success:
+            flash('Glucose record added successfully!', 'success')
+            return redirect(url_for('health.glucose_records'))
+        else:
+            flash(f'Error adding glucose record: {error}', 'danger')
+            return render_template('pages/glucose_logger.html')
+
+    return render_template('pages/glucose_logger.html')
+
+@health.route('/glucose/records')
+@login_required
+def glucose_records():
+    """
+    Route for viewing all glucose records.
+    """
+    health_service = current_app.health_service
+    success, records, error = health_service.get_glucose_records(current_user.id)
+    if success:
+        return render_template('pages/glucose_records.html', records=records)
+    else:
+        flash(f'Error retrieving records: {error}', 'danger')
+        return redirect(url_for('pages.home'))
+
+@health.route('/glucose/edit/<int:record_id>', methods=['GET', 'POST'])
+@login_required
+def edit_glucose_record(record_id):
+    """
+    Route for editing an existing glucose record.
+    """
+    record = GlucoseRecord.query.get_or_404(record_id)
+
+    # Check permissions
+    health_service = current_app.health_service
+    if not health_service.glucose_manager.has_permission(record, current_user.id):
+        flash('You do not have permission to edit this record.', 'danger')
+        return redirect(url_for('health.glucose_records'))
+
+    if request.method == 'POST':
+        try:
+            glucose_level = int(request.form['glucose_level'])
+            date = request.form['date']
+            time = request.form['time']
+        except ValueError:
+            flash('Invalid input. Please check your entries.', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
+
+        success, error = health_service.update_glucose_record(
+            record_id=record_id,
+            user_id=current_user.id,
+            glucose_level=glucose_level,
+            date=date,
+            time=time
+        )
+
+        if success:
+            flash('Glucose record updated successfully!', 'success')
+            return redirect(url_for('health.glucose_records'))
+        else:
+            flash(f'Error updating record: {error}', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
+
+    return render_template('pages/edit_glucose_record.html', record=record)
+
+@health.route('/glucose/delete/<int:record_id>', methods=['POST'])
+@login_required
+def delete_glucose_record(record_id):
+    """
+    Route for deleting a glucose record.
+    """
+    health_service = current_app.health_service
+    success, error = health_service.delete_glucose_record(record_id, current_user.id)
+    if success:
+        flash('Glucose record deleted successfully.', 'success')
+    else:
+        flash(f'Error deleting record: {error}', 'danger')
+    return redirect(url_for('health.glucose_records'))
+
+@health.route('/blood_pressure/logger', methods=['GET', 'POST'])
+@login_required
+def blood_pressure_logger():
+    """
+    Route for adding a new blood pressure record.
+    """
+    health_service = current_app.health_service
+    if request.method == 'POST':
+        try:
+            systolic = int(request.form['systolic'])
+            diastolic = int(request.form['diastolic'])
+            date = request.form['date']
+            time = request.form['time']
+        except (ValueError, KeyError):
+            flash('Invalid input. Please check your entries.', 'danger')
+            return render_template('pages/blood_pressure_logger.html')
+
+        success, record, error = health_service.add_blood_pressure_record(
+            user_id=current_user.id,
+            systolic=systolic,
+            diastolic=diastolic,
+            date=date,
+            time=time
+        )
+
+        if success:
+            flash('Blood pressure record added successfully!', 'success')
+            return redirect(url_for('health.blood_pressure_records'))
+        else:
+            flash(f'Error adding blood pressure record: {error}', 'danger')
+            return render_template('pages/blood_pressure_logger.html')
+
+    return render_template('pages/blood_pressure_logger.html')
+
+@health.route('/blood_pressure/records')
+@login_required
+def blood_pressure_records():
+    """
+    Route for viewing all blood pressure records.
+    """
+    health_service = current_app.health_service
+    success, records, error = health_service.get_blood_pressure_records(current_user.id)
+    if success:
+        return render_template('pages/blood_pressure_records.html', records=records)
+    else:
+        flash(f'Error retrieving records: {error}', 'danger')
+        return redirect(url_for('pages.home'))
+
+@health.route('/blood_pressure/edit/<int:record_id>', methods=['GET', 'POST'])
+@login_required
+def edit_blood_pressure_record(record_id):
+    """
+    Route for editing an existing blood pressure record.
+    """
+    record = BloodPressureRecord.query.get_or_404(record_id)
+
+    # Check permissions
+    health_service = current_app.health_service
+    if not health_service.blood_pressure_manager.has_permission(record, current_user.id):
+        flash('You do not have permission to edit this record.', 'danger')
+        return redirect(url_for('health.blood_pressure_records'))
+
+    if request.method == 'POST':
+        try:
+            systolic = int(request.form['systolic'])
+            diastolic = int(request.form['diastolic'])
+            date = request.form['date']
+            time = request.form['time']
+        except ValueError:
+            flash('Invalid input. Please check your entries.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        success, error = health_service.update_blood_pressure_record(
+            record_id=record_id,
+            user_id=current_user.id,
+            systolic=systolic,
+            diastolic=diastolic,
+            date=date,
+            time=time
+        )
+
+        if success:
+            flash('Blood pressure record updated successfully!', 'success')
+            return redirect(url_for('health.blood_pressure_records'))
+        else:
+            flash(f'Error updating record: {error}', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+    return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+@health.route('/blood_pressure/delete/<int:record_id>', methods=['POST'])
+@login_required
+def delete_blood_pressure_record(record_id):
+    """
+    Route for deleting a blood pressure record.
+    """
+    health_service = current_app.health_service
+    success, error = health_service.delete_blood_pressure_record(record_id, current_user.id)
+    if success:
+        flash('Blood pressure record deleted successfully.', 'success')
+    else:
+        flash(f'Error deleting record: {error}', 'danger')
+    return redirect(url_for('health.blood_pressure_records'))
+
 
 def notify_companions(user_id, data_type, value):
     """
@@ -146,302 +355,3 @@ def notify_companions(user_id, data_type, value):
 
         db.session.commit()
 #------------------------------------------
-
-health = Blueprint('health', __name__)
-
-@health.route('/health-logger')
-@login_required
-def health_logger():
-    return render_template('pages/health_logger.html')
-
-@health.route('/health-logger/glucose/')
-@login_required
-# @check_companion_access('glucose')
-def glucose_logger():
-    return render_template('pages/glucose_logger.html')
-
-@health.route('/health-logger/blood_pressure')
-@login_required
-# @check_companion_access('blood_pressure')
-def blood_pressure_logger():
-    return render_template('pages/blood_pressure_logger.html')
-
-@health.route('/glucose', methods=['GET', 'POST'])
-@login_required
-def record_glucose():
-    if request.method == 'POST':
-        try:
-            glucose_level = int(request.form['glucose_level'])
-            glucose_type = request.form['glucose_type']
-            if glucose_type not in [gt.value for gt in GlucoseType]:
-                flash('Invalid glucose type selected.', 'danger')
-                return render_template('pages/glucose_logger.html')
-        except (ValueError, KeyError):
-            flash('Invalid input.', 'danger')
-            return render_template('pages/glucose_logger.html')
-        
-        MIN_GLUCOSE = 50
-        MAX_GLUCOSE = 350
-
-        if not (MIN_GLUCOSE <= glucose_level <= MAX_GLUCOSE):
-            flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
-            return render_template('pages/glucose_logger.html')
-        
-        date_str = request.form['date']
-        time_str = request.form['time']
-
-        if is_duplicate_record(GlucoseRecord, current_user.id, date_str, time_str):
-            flash('A glucose record for this date and time already exists.', 'warning')
-            return render_template('pages/glucose_logger.html')
-
-        new_record = GlucoseRecord(
-            glucose_level=glucose_level,
-            glucose_type=GlucoseType(glucose_type),
-            date=date_str,
-            time=time_str,
-            user_id=current_user.id
-        )
-
-        db.session.add(new_record)
-        db.session.commit()
-
-        data_type = 'fasting_glucose' if glucose_type == "FASTING" else 'postprandial_glucose'
-        value = {'glucose_level': glucose_level}
-        notify_companions(current_user.id, data_type, value)
-
-        flash('Glucose data logged successfully!', 'success')
-        return redirect(url_for('health.glucose_logger'))
-
-    return render_template('pages/glucose_logger.html')
-
-@health.route('/blood_pressure', methods=['GET', 'POST'])
-@login_required
-def record_blood_pressure():
-    if request.method == 'POST':
-        try:
-            systolic = int(request.form['systolic'])
-            diastolic = int(request.form['diastolic'])
-        except ValueError:
-            flash('Systolic and Diastolic values must be integers.', 'danger')
-            return render_template('pages/blood_pressure_logger.html')
-
-        # Valid ranges
-        MIN_SYSTOLIC = 50
-        MAX_SYSTOLIC = 300
-        MIN_DIASTOLIC = 30
-        MAX_DIASTOLIC = 200
-
-        if not (MIN_SYSTOLIC <= systolic <= MAX_SYSTOLIC):
-            flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
-            return render_template('pages/blood_pressure_logger.html')
-
-        if not (MIN_DIASTOLIC <= diastolic <= MAX_DIASTOLIC):
-            flash(f'Diastolic value must be between {MIN_DIASTOLIC} and {MAX_DIASTOLIC} mm Hg.', 'danger')
-            return render_template('pages/blood_pressure_logger.html')
-
-        date_str = request.form['date']
-        time_str = request.form['time']
-
-        if is_duplicate_record(BloodPressureRecord, current_user.id, date_str, time_str):
-            flash('A blood pressure record for this date and time already exists.', 'warning')
-            return render_template('pages/blood_pressure_logger.html')
-        # Create a new BloodPressureRecord
-        new_record = BloodPressureRecord(
-            systolic=systolic,
-            diastolic=diastolic,
-            date=date_str,
-            time=time_str,
-            user_id=current_user.id
-        )
-
-        # Add and commit the new record
-        db.session.add(new_record)
-        db.session.commit()
-
-        # Notify companions if the data is in the risky range
-        value = {'systolic': systolic, 'diastolic': diastolic}
-        notify_companions(current_user.id, 'blood_pressure', value)
-
-        flash('Blood pressure data logged successfully!', 'success')
-        return redirect(url_for('health.blood_pressure_logger'))
-
-    return render_template('pages/blood_pressure_logger.html')
-
-
-@health.route('/glucose/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-def edit_glucose_record(id):
-    """
-    Edit an existing glucose record.
-    """
-    record = GlucoseRecord.query.get_or_404(id)
-
-    # Check permissions (either owner or authorized companion)
-    has_permission = False
-    if record.user_id == current_user.id:
-        has_permission = True
-    elif current_user.user_type == "COMPANION":
-        # Check companion access
-        access = CompanionAccess.query.filter_by(
-            patient_id=record.user_id,
-            companion_id=current_user.id,
-        ).first()
-        if access and access.glucose_access == "EDIT":
-            has_permission = True
-
-    if not has_permission:
-        flash("You do not have permission to edit this record.", 'danger')
-        return redirect(url_for('health.glucose_logger'))
-
-    if request.method == 'POST':
-        try:
-            new_glucose_level = int(request.form['glucose_level'])
-        except ValueError:
-            flash('Glucose level must be an integer.', 'danger')
-            return render_template('pages/edit_glucose_record.html', record=record)
-        
-        # Validate glucose level boundaries
-        MIN_GLUCOSE = 70
-        MAX_GLUCOSE = 180
-
-        if not (MIN_GLUCOSE <= new_glucose_level <= MAX_GLUCOSE):
-            flash(f'Glucose level must be between {MIN_GLUCOSE} and {MAX_GLUCOSE} mg/dL.', 'danger')
-            return render_template('pages/edit_glucose_record.html', record=record)
-
-        date_str = request.form['date']
-        time_str = request.form['time']
-
-        # Check for duplicate record
-        if (date_str != record.date or time_str != record.time) and is_duplicate_record(GlucoseRecord, record.user_id, date_str, time_str):
-            flash('A glucose record for this date and time already exists.', 'warning')
-            return render_template('pages/edit_glucose_record.html', record=record)
-
-        # Update the record
-        record.glucose_level = new_glucose_level
-        record.date = date_str
-        record.time = time_str
-
-        try:
-            db.session.commit()
-            flash('Glucose record updated successfully!', 'success')
-            # Redirect to appropriate view based on user type
-            if current_user.user_type == "COMPANION":
-                return redirect(url_for('connection.view_patient_data', patient_id=record.user_id))
-            return redirect(url_for('health.glucose_logger'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating glucose record: {str(e)}', 'danger')
-            return render_template('pages/edit_glucose_record.html', record=record)
-
-    return render_template('pages/edit_glucose_record.html', record=record)
-
-@health.route('/blood_pressure_records')
-@login_required
-def blood_pressure_records():
-    records = BloodPressureRecord.query.filter_by(user_id=current_user.id).order_by(
-        BloodPressureRecord.date.desc(), BloodPressureRecord.time.desc()).all()
-    return render_template('pages/blood_pressure_records.html', records=records)
-
-@health.route('/glucose_records')
-@login_required
-def glucose_records():
-    records = GlucoseRecord.query.filter_by(user_id=current_user.id).order_by(
-        GlucoseRecord.date.desc(), GlucoseRecord.time.desc()).all()
-    return render_template('pages/glucose_records.html', records=records)
-
-@health.route('/glucose_records/delete/<int:id>', methods=['POST'])
-@login_required
-def delete_glucose_record(id):
-    record = GlucoseRecord.query.get_or_404(id)
-    if record.user_id != current_user.id:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('health.glucose_records'))
-    db.session.delete(record)
-    db.session.commit()
-    flash('Glucose record deleted.', 'success')
-    return redirect(url_for('health.glucose_records'))
-
-@health.route('/blood_pressure_records/delete/<int:id>', methods=['POST'])
-@login_required
-def delete_blood_pressure_record(id):
-    record = BloodPressureRecord.query.get_or_404(id)
-    if record.user_id != current_user.id:
-        flash('Unauthorized access.', 'danger')
-        return redirect(url_for('health.blood_pressure_records'))
-    db.session.delete(record)
-    db.session.commit()
-    flash('Blood pressure record deleted.', 'success')
-    return redirect(url_for('health.blood_pressure_records'))
-
-@health.route('/blood_pressure/edit/<int:id>', methods=['GET', 'POST'])
-@login_required
-def edit_blood_pressure_record(id):
-    """
-    Edit an existing blood pressure record.
-    """
-    record = BloodPressureRecord.query.get_or_404(id)
-
-    # Check permissions (either owner or authorized companion)
-    has_permission = False
-    if record.user_id == current_user.id:
-        has_permission = True
-    elif current_user.user_type == "COMPANION":
-        # Check companion access
-        access = CompanionAccess.query.filter_by(
-            patient_id=record.user_id,
-            companion_id=current_user.id,
-        ).first()
-        if access and access.blood_pressure_access == "EDIT":
-            has_permission = True
-
-    if not has_permission:
-        flash("You do not have permission to edit this record.", 'danger')
-        return redirect(url_for('blood_pressure_logger'))
-
-    if request.method == 'POST':
-        try:
-            new_systolic = int(request.form['systolic'])
-            new_diastolic = int(request.form['diastolic'])
-        except ValueError:
-            flash('Systolic and Diastolic values must be integers.', 'danger')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
-
-        # Validate ranges
-        MIN_SYSTOLIC, MAX_SYSTOLIC = 90, 180
-        MIN_DIASTOLIC, MAX_DIASTOLIC = 60, 120
-
-        if not (MIN_SYSTOLIC <= new_systolic <= MAX_SYSTOLIC):
-            flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
-
-        if not (MIN_DIASTOLIC <= new_diastolic <= MAX_DIASTOLIC):
-            flash(f'Diastolic value must be between {MIN_DIASTOLIC} and {MAX_DIASTOLIC} mm Hg.', 'danger')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
-
-        date_str = request.form['date']
-        time_str = request.form['time']
-
-        # Check for duplicate record
-        if (date_str != record.date or time_str != record.time) and is_duplicate_record(BloodPressureRecord, record.user_id, date_str, time_str):
-            flash('A blood pressure record for this date and time already exists.', 'warning')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
-
-        # Update the record
-        record.systolic = new_systolic
-        record.diastolic = new_diastolic
-        record.date = date_str
-        record.time = time_str
-
-        try:
-            db.session.commit()
-            flash('Blood pressure record updated successfully!', 'success')
-            # Redirect to appropriate view based on user type
-            if current_user.user_type == "COMPANION":
-                return redirect(url_for('view_patient_data', patient_id=record.user_id))
-            return redirect(url_for('health.blood_pressure_logger'))
-        except Exception as e:
-            db.session.rollback()
-            flash(f'Error updating blood pressure record: {str(e)}', 'danger')
-            return render_template('pages/edit_blood_pressure_record.html', record=record)
-
-    return render_template('pages/edit_blood_pressure_record.html', record=record)

@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container py-5">
     <h1 class="mb-4">Record Glucose Level</h1>
-    <form method="POST" action="{{ url_for('health.record_glucose') }}">
+    <form method="POST" action="{{ url_for('health.glucose_logger') }}">
         <div class="form-group">
             <label for="glucose_level">Glucose Level (mg/dL)</label>
             <input type="number" class="form-control" id="glucose_level" name="glucose_level" required>
@@ -13,8 +13,8 @@
             <label for="glucose_type">Glucose Type</label>
             <select class="form-control" id="glucose_type" name="glucose_type" required>
                 <option value="" disabled selected>Select type</option>
-                <option value="Fasting">Fasting</option>
-                <option value="Postprandial">Postprandial</option>
+                <option value="FASTING">Fasting</option>
+                <option value="POSTPRANDIAL">PostPrandial</option>
             </select>
         </div>
         <div class="form-group">

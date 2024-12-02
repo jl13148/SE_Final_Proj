@@ -4,7 +4,7 @@
 {% block content %}
 <div class="container mt-4">
     <h2>Edit Blood Pressure Record</h2>
-    <form method="POST" action="{{ url_for('health.edit_blood_pressure_record', id=record.id) }}">
+    <form method="POST" action="{{ url_for('health.edit_blood_pressure_record', record_id=record.id) }}">
         <div class="form-group">
             <label for="systolic">Systolic (mm Hg)</label>
             <input type="number" class="form-control" id="systolic" name="systolic" value="{{ record.systolic }}" required>

@@ -14,7 +14,7 @@ from .controllers.companion import companion as companion_blueprint
 
 # Import services
 from .services.auth_service import AuthService
-# from .services.health_service import HealthService
+from .services.health_service import HealthService
 from .services.medication_service import MedicationService
 # from .services.report_service import ReportService
 # from .services.notification_service import NotificationService
@@ -42,7 +42,7 @@ def create_app(config_name=None):
     # Store services in app context for access in routes
     with app.app_context():
         app.auth_service = AuthService(db)
-        # app.health_service = HealthService(db)
+        app.health_service = HealthService(db)
         app.medication_service = MedicationService(db)
         # app.report_service = ReportService(db)
         # app.notification_service = NotificationService(db)

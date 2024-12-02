@@ -174,8 +174,8 @@ class Notification(db.Model):
         return f'<Notification {self.message} to User {self.user_id}>'
     
 class GlucoseType(Enum):
-    FASTING = "Fasting"
-    POSTPRANDIAL = "Postprandial"
+    FASTING = 'FASTING'
+    POSTPRANDIAL = 'POSTPRANDIAL'
 
 class GlucoseRecord(db.Model):
     __tablename__ = 'glucose_records'

@@ -23,8 +23,8 @@
                 <td>{{ record.systolic }}</td>
                 <td>{{ record.diastolic }}</td>
                 <td>
-                    <a href="{{ url_for('health.edit_blood_pressure_record', id=record.id) }}" class="btn btn-info btn-sm">Edit</a>
-                    <form action="{{ url_for('health.delete_blood_pressure_record', id=record.id) }}" method="POST" style="display:inline;" onsubmit="return confirmDelete();">
+                    <a href="{{ url_for('health.edit_blood_pressure_record', record_id=record.id) }}" class="btn btn-info btn-sm">Edit</a>
+                    <form action="{{ url_for('health.delete_blood_pressure_record', record_id=record.id) }}" method="POST" style="display:inline;" onsubmit="return confirmDelete();">
                         <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                     </form>
                 </td>
