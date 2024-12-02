@@ -114,16 +114,22 @@ class ScheduleManager:
     def get_daily_medications(self, user_id: int) -> Tuple[bool, List[Dict], Optional[str]]:
         try:
             medications = Medication.query.filter_by(user_id=user_id).all()
+            today = datetime.now().date()
             medication_list = []
             
             for med in medications:
+                # Check if medication was taken today
+                taken = MedicationLog.query.filter(
+                    MedicationLog.medication_id == med.id,
+                    MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
+                ).first() is not None
+                
                 medication_list.append({
                     'id': med.id,
                     'name': med.name,
                     'dosage': med.dosage,
                     'time': med.time.strftime('%I:%M %p'),
-                    'frequency': med.frequency,
-                    'taken': False
+                    'taken': taken
                 })
             
             return True, medication_list, None

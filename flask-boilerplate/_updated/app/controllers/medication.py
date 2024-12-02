@@ -133,3 +133,16 @@ def check_reminders():
         return jsonify({'error': error}), 500
         
     return jsonify(reminders) 
+
+@medication.route('/medications/log/<int:id>', methods=['POST'])
+@login_required
+def log_medication(id):
+    success, error = current_app.medication_service.log_medication_taken(
+        medication_id=id,
+        user_id=current_user.id
+    )
+    
+    if not success:
+        return jsonify({'success': False, 'message': error}), 400
+        
+    return jsonify({'success': True})

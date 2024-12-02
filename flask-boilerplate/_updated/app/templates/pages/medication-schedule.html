@@ -153,6 +153,10 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
+    if (Notification.permission !== 'granted') {
+        Notification.requestPermission();
+    }
+
     async function logMedication(medicationId, button) {
         try {
             const response = await fetch(`/medications/log/${medicationId}`, {
@@ -162,16 +166,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             });
             
-            if (response.ok) {
-                // Update button appearance directly instead of refreshing
-                button.className = 'btn-taken';
-                button.disabled = true;
-                button.textContent = 'Taken ✓';
-                button.closest('.medication-item').classList.add('taken');
-            } else {
-                const data = await response.json();
-                alert(data.message || 'Failed to log medication');
+            if (!response.ok) {
+                throw new Error('Failed to log medication');
             }
+            
+            // Update UI
+            button.className = 'btn-taken';
+            button.disabled = true;
+            button.textContent = 'Taken ✓';
+            button.closest('.medication-item').classList.add('taken');
         } catch (error) {
             console.error('Error:', error);
             alert('Error logging medication');
@@ -222,25 +225,43 @@ document.addEventListener('DOMContentLoaded', function() {
     // Make logMedication available globally
     window.logMedication = logMedication;
     
-    // Check for reminders every minute
-    setInterval(async () => {
+    // // Check for reminders every minute
+    // setInterval(async () => {
+    //     try {
+    //         const response = await fetch('/medications/check-reminders');
+    //         const reminders = await response.json();
+            
+    //         if (reminders.length > 0) {
+    //             if (Notification.permission === "granted") {
+    //                 reminders.forEach(med => {
+    //                     new Notification("Medication Reminder", {
+    //                         body: `Time to take ${med.name} (${med.dosage})`
+    //                     });
+    //                 });
+    //             }
+    //         }
+    //     } catch (error) {
+    //         console.error('Error checking reminders:', error);
+    //     }
+    // }, 60000);
+    setInterval(checkReminders, 60000);
+
+    async function checkReminders() {
         try {
             const response = await fetch('/medications/check-reminders');
             const reminders = await response.json();
             
-            if (reminders.length > 0) {
+            reminders.forEach(med => {
                 if (Notification.permission === "granted") {
-                    reminders.forEach(med => {
-                        new Notification("Medication Reminder", {
-                            body: `Time to take ${med.name} (${med.dosage})`
-                        });
+                    new Notification("Medication Reminder", {
+                        body: `Time to take ${med.name} (${med.dosage})`
                     });
                 }
-            }
+            });
         } catch (error) {
             console.error('Error checking reminders:', error);
         }
-    }, 60000);
+    }
 });
 </script>
 {% endblock %}
