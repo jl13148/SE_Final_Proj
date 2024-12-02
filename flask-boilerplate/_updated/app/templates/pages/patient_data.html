@@ -96,7 +96,7 @@
                                             <td>{{ record.glucose_level }}</td>
                                             {% if access.glucose_access == "EDIT" %}
                                                 <td>
-                                                    <a href="{{ url_for('health.edit_glucose_record', id=record.id) }}" 
+                                                    <a href="{{ url_for('health.edit_glucose_record', record_id=record.id) }}" 
                                                        class="btn btn-sm btn-primary">Edit</a>
                                                 </td>
                                             {% endif %}
@@ -145,7 +145,7 @@
                                             <td>{{ record.diastolic }}</td>
                                             {% if access.blood_pressure_access == "EDIT" %}
                                                 <td>
-                                                    <a href="{{ url_for('health.edit_blood_pressure_record', id=record.id) }}" 
+                                                    <a href="{{ url_for('health.edit_blood_pressure_record', record_id=record.id) }}" 
                                                        class="btn btn-sm btn-primary">Edit</a>
                                                 </td>
                                             {% endif %}
