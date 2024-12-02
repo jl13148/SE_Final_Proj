@@ -372,3 +372,76 @@ def delete_blood_pressure_record(id):
     db.session.commit()
     flash('Blood pressure record deleted.', 'success')
     return redirect(url_for('health.blood_pressure_records'))
+
+@health.route('/blood_pressure/edit/<int:id>', methods=['GET', 'POST'])
+@login_required
+def edit_blood_pressure_record(id):
+    """
+    Edit an existing blood pressure record.
+    """
+    record = BloodPressureRecord.query.get_or_404(id)
+
+    # Check permissions (either owner or authorized companion)
+    has_permission = False
+    if record.user_id == current_user.id:
+        has_permission = True
+    elif current_user.user_type == "COMPANION":
+        # Check companion access
+        access = CompanionAccess.query.filter_by(
+            patient_id=record.user_id,
+            companion_id=current_user.id,
+        ).first()
+        if access and access.blood_pressure_access == "EDIT":
+            has_permission = True
+
+    if not has_permission:
+        flash("You do not have permission to edit this record.", 'danger')
+        return redirect(url_for('blood_pressure_logger'))
+
+    if request.method == 'POST':
+        try:
+            new_systolic = int(request.form['systolic'])
+            new_diastolic = int(request.form['diastolic'])
+        except ValueError:
+            flash('Systolic and Diastolic values must be integers.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        # Validate ranges
+        MIN_SYSTOLIC, MAX_SYSTOLIC = 90, 180
+        MIN_DIASTOLIC, MAX_DIASTOLIC = 60, 120
+
+        if not (MIN_SYSTOLIC <= new_systolic <= MAX_SYSTOLIC):
+            flash(f'Systolic value must be between {MIN_SYSTOLIC} and {MAX_SYSTOLIC} mm Hg.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        if not (MIN_DIASTOLIC <= new_diastolic <= MAX_DIASTOLIC):
+            flash(f'Diastolic value must be between {MIN_DIASTOLIC} and {MAX_DIASTOLIC} mm Hg.', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        date_str = request.form['date']
+        time_str = request.form['time']
+
+        # Check for duplicate record
+        if (date_str != record.date or time_str != record.time) and is_duplicate_record(BloodPressureRecord, record.user_id, date_str, time_str):
+            flash('A blood pressure record for this date and time already exists.', 'warning')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+        # Update the record
+        record.systolic = new_systolic
+        record.diastolic = new_diastolic
+        record.date = date_str
+        record.time = time_str
+
+        try:
+            db.session.commit()
+            flash('Blood pressure record updated successfully!', 'success')
+            # Redirect to appropriate view based on user type
+            if current_user.user_type == "COMPANION":
+                return redirect(url_for('view_patient_data', patient_id=record.user_id))
+            return redirect(url_for('health.blood_pressure_logger'))
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating blood pressure record: {str(e)}', 'danger')
+            return render_template('pages/edit_blood_pressure_record.html', record=record)
+
+    return render_template('pages/edit_blood_pressure_record.html', record=record)
