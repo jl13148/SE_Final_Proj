@@ -38,6 +38,7 @@ class HealthService:
         """
         Notify companion users when health data is in a risky range.
         """
+        companions = CompanionAccess.query.filter_by(patient_id=user_id).all()
         thresholds = {
             'fasting_glucose': {
                 'low': 70,
@@ -95,8 +96,12 @@ class HealthService:
                     severity = None  # Normal readings don't need notifications
 
                 if severity:
-                    message = (f"{reading_type} glucose level: {glucose_level} mg/dL - {severity}. {advice}")
-                    messages.append(message)
+                    for companion in companions:
+                        if companion.glucose_access == 'NONE':
+                            continue
+                        else:
+                            message = (f"{reading_type} glucose level: {glucose_level} mg/dL - {severity}. {advice}")
+                            messages.append(message)
 
         elif data_type == 'blood_pressure':
             systolic = value.get('systolic')
@@ -134,15 +139,18 @@ class HealthService:
                 # Consolidate severity
                 severities = set(filter(None, [sys_severity, dia_severity]))
                 if severities:
-                    severity = ', '.join(severities)
-                    advice = 'Consult with healthcare provider.' if 'High' in severities or 'Low' in severities else 'Immediate medical attention recommended.'
-                    message = (f"Blood pressure reading: {bp_reading} - {severity}. {advice}")
-                    messages.append(message)
+                    for companion in companions:
+                        if companion.blood_pressure_access == 'NONE':
+                            continue
+                        else:
+                            severity = ', '.join(severities)
+                            advice = 'Consult with healthcare provider.' if 'High' in severities or 'Low' in severities else 'Immediate medical attention recommended.'
+                            message = (f"Blood pressure reading: {bp_reading} - {severity}. {advice}")
+                            messages.append(message)
 
         # Send notifications if there are any messages
         if messages:
             full_message = ' '.join(messages)
-            companions = CompanionAccess.query.filter_by(patient_id=user_id).all()
             for companion in companions:
                 companion_user = User.query.get(companion.companion_id)
                 if companion_user:
