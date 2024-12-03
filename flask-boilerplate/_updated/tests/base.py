@@ -26,7 +26,7 @@ class BaseTestCase(unittest.TestCase):
         
         # Create test medication
         self.test_medication = self.create_test_medication('Test Med', time(9, 0)) 
-
+    
     def tearDown(self):
         """Clean up after tests"""
         db.session.remove()

@@ -13,26 +13,22 @@ class MedicationManager:
 
     def get_medications(self, user_id: int) -> Tuple[bool, Optional[List[Dict]], Optional[str]]:
         """Get all medications with formatted time for display"""
-        try:
-            medications = Medication.query.filter_by(user_id=user_id).all()
-            if medications is None:
-                return True, [], None  # Return empty list instead of None
-            
-            # Format medications for template
-            formatted_medications = []
-            for med in medications:
-                formatted_medications.append({
-                    'id': med.id,
-                    'name': med.name,
-                    'dosage': med.dosage,
-                    'frequency': med.frequency,
-                    'time': med.time
-                })
-            
-            return True, formatted_medications, None
-        except Exception as e:
-            print(f"Database error in get_medications: {str(e)}")
-            return False, None, str(e)
+        medications = Medication.query.filter_by(user_id=user_id).all()
+        if medications is None:
+            return True, [], None  # Return empty list instead of None
+        
+        # Format medications for template
+        formatted_medications = []
+        for med in medications:
+            formatted_medications.append({
+                'id': med.id,
+                'name': med.name,
+                'dosage': med.dosage,
+                'frequency': med.frequency,
+                'time': med.time
+            })
+        
+        return True, formatted_medications, None
 
     def add_medication(self, user_id: int, name: str, dosage: str, frequency: str, time: time) -> Tuple[bool, Optional[str]]:
         try:
@@ -112,58 +108,52 @@ class ScheduleManager:
         self.db = db
 
     def get_daily_medications(self, user_id: int) -> Tuple[bool, List[Dict], Optional[str]]:
-        try:
-            medications = Medication.query.filter_by(user_id=user_id).all()
-            today = datetime.now().date()
-            medication_list = []
+        medications = Medication.query.filter_by(user_id=user_id).all()
+        today = datetime.now().date()
+        medication_list = []
+        
+        for med in medications:
+            # Check if medication was taken today
+            taken = MedicationLog.query.filter(
+                MedicationLog.medication_id == med.id,
+                MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
+            ).first() is not None
             
-            for med in medications:
-                # Check if medication was taken today
+            medication_list.append({
+                'id': med.id,
+                'name': med.name,
+                'dosage': med.dosage,
+                'time': med.time.strftime('%I:%M %p'),
+                'taken': taken
+            })
+        
+        return True, medication_list, None
+
+    def get_upcoming_reminders(self, user_id: int, minutes_ahead: int = 15) -> Tuple[bool, List[Dict], Optional[str]]:
+        now = datetime.now()
+        today = now.date()
+        medications = Medication.query.filter_by(user_id=user_id).all()
+        upcoming_medications = []
+
+        for med in medications:
+            med_time = datetime.combine(today, med.time)
+            time_diff = (med_time - now).total_seconds() / 60
+            
+            if 0 <= time_diff <= minutes_ahead:
                 taken = MedicationLog.query.filter(
                     MedicationLog.medication_id == med.id,
                     MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
                 ).first() is not None
                 
-                medication_list.append({
-                    'id': med.id,
-                    'name': med.name,
-                    'dosage': med.dosage,
-                    'time': med.time.strftime('%I:%M %p'),
-                    'taken': taken
-                })
-            
-            return True, medication_list, None
-        except Exception as e:
-            return False, [], str(e)
-
-    def get_upcoming_reminders(self, user_id: int, minutes_ahead: int = 15) -> Tuple[bool, List[Dict], Optional[str]]:
-        try:
-            now = datetime.now()
-            today = now.date()
-            medications = Medication.query.filter_by(user_id=user_id).all()
-            upcoming_medications = []
-
-            for med in medications:
-                med_time = datetime.combine(today, med.time)
-                time_diff = (med_time - now).total_seconds() / 60
-                
-                if 0 <= time_diff <= minutes_ahead:
-                    taken = MedicationLog.query.filter(
-                        MedicationLog.medication_id == med.id,
-                        MedicationLog.taken_at >= datetime.combine(today, datetime.min.time())
-                    ).first() is not None
-                    
-                    if not taken:
-                        upcoming_medications.append({
-                            'id': med.id,
-                            'name': med.name,
-                            'dosage': med.dosage,
-                            'time': med.time.strftime('%I:%M %p')
-                        })
-            
-            return True, upcoming_medications, None
-        except Exception as e:
-            return False, [], str(e)
+                if not taken:
+                    upcoming_medications.append({
+                        'id': med.id,
+                        'name': med.name,
+                        'dosage': med.dosage,
+                        'time': med.time.strftime('%I:%M %p')
+                    })
+        
+        return True, upcoming_medications, None
 
     def log_medication_taken(self, medication_id: int, user_id: int) -> Tuple[bool, Optional[str]]:
         try:
@@ -179,7 +169,6 @@ class ScheduleManager:
         except Exception as e:
             self.db.session.rollback()
             return False, str(e)
-
 
 class MedicationService:
     """
