@@ -1,4 +1,6 @@
 # tests/unit/services/test_medication_service.py
+import unittest
+import uuid
 from datetime import time, datetime, timedelta
 from tests.base import BaseTestCase
 from app.services.medication_service import MedicationService
@@ -10,15 +12,8 @@ class TestMedicationService(BaseTestCase):
         super().setUp()
         self.medication_service = MedicationService(db)
         
-        # Create companion user and access for testing
-        self.companion = User(
-            username='companion',
-            email='companion@test.com',
-            user_type='COMPANION'
-        )
-        self.companion.set_password('password123')
-        db.session.add(self.companion)
-        db.session.commit()
+        # Create companion user and access for testing using helper method
+        self.companion = self.create_test_user('companion@test.com', user_type='COMPANION')
         
         self.companion_access = CompanionAccess(
             patient_id=self.test_user.id,
@@ -29,13 +24,17 @@ class TestMedicationService(BaseTestCase):
         )
         db.session.add(self.companion_access)
         db.session.commit()
+        
+        # Create a test medication called 'Test Med' needed for the tests
+        self.test_medication = self.create_test_medication('Test Med', time(9, 0))
 
+    # Existing Tests
     def test_get_medications_success(self):
         """Test successfully retrieving medications for a user"""
         success, medications, error = self.medication_service.get_medications(self.test_user.id)
         
         self.assertTrue(success)
-        self.assertEqual(len(medications), 1)
+        self.assertEqual(len(medications), 2)
         self.assertEqual(medications[0]['name'], 'Test Med')
         self.assertIsNone(error)
 
@@ -123,6 +122,44 @@ class TestMedicationService(BaseTestCase):
         logs = MedicationLog.query.filter_by(medication_id=self.test_medication.id).all()
         self.assertEqual(len(logs), 0)
 
+    def test_delete_medication_unauthorized(self):
+        """Test deleting a medication that does not belong to the user"""
+        # Create another user
+        another_user = self.create_test_user('another@test.com')
+        # Add a medication for another user
+        another_med = Medication(
+            name="Another Med",
+            dosage="100mg",
+            frequency="twice_daily",
+            time=time(8, 0),
+            user_id=another_user.id
+        )
+        db.session.add(another_med)
+        db.session.commit()
+        
+        # Attempt to delete another user's medication
+        success, error = self.medication_service.delete_medication(
+            medication_id=another_med.id,
+            user_id=self.test_user.id  # Not the owner
+        )
+        
+        self.assertFalse(success)
+        self.assertEqual(error, "Unauthorized action")
+        
+        # Ensure medication still exists
+        medication = Medication.query.get(another_med.id)
+        self.assertIsNotNone(medication)
+
+    def test_delete_medication_nonexistent(self):
+        """Test deleting a non-existent medication"""
+        success, error = self.medication_service.delete_medication(
+            medication_id=1234,  # Assuming this ID does not exist
+            user_id=self.test_user.id
+        )
+        
+        self.assertFalse(success)
+        self.assertIsNotNone(error)
+
     def test_update_medication_success(self):
         """Test successfully updating a medication"""
         success, error = self.medication_service.update_medication(
@@ -141,18 +178,44 @@ class TestMedicationService(BaseTestCase):
         self.assertEqual(medication.dosage, "300mg")
         self.assertEqual(medication.frequency, "twice_daily")
 
-    def test_companion_edit_permission(self):
-        """Test companion edit permissions"""
-        # Test with edit access
+    def test_update_medication_nonexistent(self):
+        """Test updating a non-existent medication"""
+        success, error = self.medication_service.update_medication(
+            medication_id=4321,  # Assuming this ID does not exist
+            name="Ghost Med",
+            dosage="500mg",
+            frequency="once_daily",
+            time=time(12, 0)
+        )
+        
+        self.assertFalse(success)
+        self.assertIsNotNone(error)
+
+    def test_check_edit_permission_success_owner(self):
+        """Test check_edit_permission when the user is the owner"""
+        success, medication, error = self.medication_service.check_edit_permission(
+            medication_id=self.test_medication.id,
+            user_id=self.test_user.id
+        )
+        
+        self.assertTrue(success)
+        self.assertIsNotNone(medication)
+        self.assertIsNone(error)
+
+    def test_check_edit_permission_success_companion_edit(self):
+        """Test check_edit_permission when the user is a companion with EDIT access"""
         success, medication, error = self.medication_service.check_edit_permission(
             medication_id=self.test_medication.id,
             user_id=self.companion.id
         )
+        
         self.assertTrue(success)
         self.assertIsNotNone(medication)
         self.assertIsNone(error)
-        
-        # Change to view access and test again
+
+    def test_check_edit_permission_failure_no_access(self):
+        """Test check_edit_permission when the companion has no access"""
+        # Change companion access to 'VIEW'
         self.companion_access.medication_access = 'VIEW'
         db.session.commit()
         
@@ -160,6 +223,22 @@ class TestMedicationService(BaseTestCase):
             medication_id=self.test_medication.id,
             user_id=self.companion.id
         )
+        
+        self.assertFalse(success)
+        self.assertIsNone(medication)
+        self.assertEqual(error, "Unauthorized access")
+
+    def test_check_edit_permission_failure_no_companion_access(self):
+        """Test check_edit_permission when there is no companion access"""
+        # Remove companion access
+        db.session.delete(self.companion_access)
+        db.session.commit()
+        
+        success, medication, error = self.medication_service.check_edit_permission(
+            medication_id=self.test_medication.id,
+            user_id=self.companion.id
+        )
+        
         self.assertFalse(success)
         self.assertIsNone(medication)
         self.assertEqual(error, "Unauthorized access")
@@ -180,11 +259,13 @@ class TestMedicationService(BaseTestCase):
         )
         
         self.assertTrue(success)
-        self.assertEqual(len(medications), 2)
+        self.assertEqual(len(medications), 3)
         
         # Verify taken status
-        taken_med = next(m for m in medications if m['id'] == self.test_medication.id)
-        not_taken_med = next(m for m in medications if m['id'] == med2.id)
+        taken_med = next((m for m in medications if m['id'] == self.test_medication.id), None)
+        not_taken_med = next((m for m in medications if m['id'] == med2.id), None)
+        self.assertIsNotNone(taken_med)
+        self.assertIsNotNone(not_taken_med)
         self.assertTrue(taken_med['taken'])
         self.assertFalse(not_taken_med['taken'])
 
@@ -194,17 +275,17 @@ class TestMedicationService(BaseTestCase):
         current_time = datetime.now().time()
         
         # Medication due in 5 minutes
+        due_soon_time = (datetime.combine(datetime.today(), current_time) + timedelta(minutes=5)).time()
         due_soon = self.create_test_medication(
             "Due Soon Med",
-            time((current_time.hour + ((current_time.minute + 5) // 60)) % 24,
-                 (current_time.minute + 5) % 60)
+            due_soon_time
         )
         
         # Medication due in 30 minutes (should not be included in 15-minute window)
+        due_later_time = (datetime.combine(datetime.today(), current_time) + timedelta(minutes=30)).time()
         due_later = self.create_test_medication(
             "Due Later Med",
-            time((current_time.hour + ((current_time.minute + 30) // 60)) % 24,
-                 (current_time.minute + 30) % 60)
+            due_later_time
         )
         
         success, reminders, error = self.medication_service.get_upcoming_reminders(
@@ -217,7 +298,7 @@ class TestMedicationService(BaseTestCase):
         self.assertEqual(reminders[0]['name'], "Due Soon Med")
         self.assertIsNone(error)
 
-    def test_log_medication_taken(self):
+    def test_log_medication_taken_success(self):
         """Test logging a taken medication"""
         success, error = self.medication_service.log_medication_taken(
             medication_id=self.test_medication.id,
@@ -234,3 +315,39 @@ class TestMedicationService(BaseTestCase):
         ).first()
         self.assertIsNotNone(log)
         self.assertIsInstance(log.taken_at, datetime)
+
+    def test_log_medication_taken_invalid_medication(self):
+        """Test logging a taken medication with invalid medication_id"""
+        success, error = self.medication_service.log_medication_taken(
+            medication_id=7777,  # Assuming this ID does not exist
+            user_id=self.test_user.id
+        )
+        
+        self.assertFalse(success)
+        self.assertIsNotNone(error)
+
+    def test_log_medication_taken_invalid_user(self):
+        """Test logging a taken medication with invalid user_id"""
+        success, error = self.medication_service.log_medication_taken(
+            medication_id=self.test_medication.id,
+            user_id=9999  # Assuming this user ID does not exist
+        )
+        
+        self.assertFalse(success)
+        self.assertIsNotNone(error)
+
+    def create_test_medication(self, name, med_time):
+        """Helper method to create a test medication"""
+        medication = Medication(
+            name=name,
+            dosage="100mg",
+            frequency="once_daily",
+            time=med_time,
+            user_id=self.test_user.id
+        )
+        db.session.add(medication)
+        db.session.commit()
+        return medication
+
+if __name__ == '__main__':
+    unittest.main()
