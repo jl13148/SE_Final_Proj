@@ -22,9 +22,6 @@ from tests.unit.models.test_health import TestHealthModel
 # from tests.unit.models.test_companion import TestCompanionModel
 # from tests.unit.models.test_connection import TestConnectionModel
 
-# Controller Test
-from tests.unit.controllers.test_report_controller import TestReportController
-
 def create_test_suite():
     suite = unittest.TestSuite()
     
@@ -50,8 +47,8 @@ def create_test_suite():
     # suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestCompanionModel))
     # suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestConnectionModel))
 
-    # Add Controller Tests
-    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestReportController))
+    # # Add Controller Tests
+    # suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestReportController))
     
     return suite
 

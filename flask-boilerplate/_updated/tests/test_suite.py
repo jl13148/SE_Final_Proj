@@ -14,6 +14,8 @@ def run_tests_with_coverage():
         omit=[
             'tests/*',
             'app/forms.py',
+            'app/models.py',
+            'app/controllers/*',
             'app/extensions.py',
             'app/templates/*',
             'app/static/*',

@@ -6,13 +6,18 @@ import io
 import csv
 from datetime import datetime
 from PyPDF2 import PdfReader
+from tests.base import BaseTestCase
 
-class TestReportService(unittest.TestCase):
 
+class TestReportService(BaseTestCase):
     def setUp(self):
+        super().setUp()
         self.mock_db = MagicMock()
-        self.user_id = 1
+        self.user_id = self.test_user.id
         self.report_service = ReportService(self.mock_db, self.user_id)
+
+    def tearDown(self):
+        super().tearDown()
 
     @patch('app.services.report_service.GlucoseRecord')
     @patch('app.services.report_service.BloodPressureRecord')

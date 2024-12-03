@@ -142,7 +142,7 @@ class TestHealthService(BaseTestCase):
         # Define Equivalence Classes
         equivalence_cases = [
             {
-                'name': 'S1D2',  # Systolic < 50 (Invalid Low), Diastolic 30-200 (Valid), Valid User ID
+                'name': 'S1D2', 
                 'input': {
                     'user_id': self.test_user.id,
                     'systolic': 40,                 # S1: <50 (Invalid Low)
@@ -151,7 +151,7 @@ class TestHealthService(BaseTestCase):
                 'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
             },
             {
-                'name': 'S2D3',  # Systolic 50-300 (Valid), Diastolic >200 (Invalid High), Invalid User ID
+                'name': 'S2D3',  
                 'input': {
                     'user_id': self.test_user.id,     
                     'systolic': 120,                # S2: 50-300 (Valid)
@@ -160,11 +160,11 @@ class TestHealthService(BaseTestCase):
                 'expected_error_substring': 'Diastolic value must be between 30 and 200 mm Hg.'
             },
             {
-                'name': 'S3D1',  # Systolic >300 (Invalid High), Diastolic None (Missing), Valid User ID
+                'name': 'S3D1',  
                 'input': {
                     'user_id': self.test_user.id,  
                     'systolic': 400,                # S3: >300 (Invalid High)
-                    'diastolic': 15               # D1: <30 (Invalid Low)
+                    'diastolic': 15                 # D1: <30 (Invalid Low)
                 },
                 'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
             },
