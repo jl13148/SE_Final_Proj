@@ -12,7 +12,7 @@ from tests.unit.services.test_medication_service import TestMedicationService
 from tests.unit.services.test_health_service import TestHealthService
 from tests.unit.services.test_medication_manager import TestMedicationManager
 from tests.unit.services.test_auth_service import TestAuthService
-# from tests.unit.services.test_companion_service import TestCompanionService
+from tests.unit.services.test_companion_service import TestCompanionService
 # from tests.unit.services.test_connection_service import TestConnectionService
 
 # Model Tests
@@ -39,7 +39,7 @@ def create_test_suite():
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestMedicationManager))
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestHealthService))
     suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestAuthService))
-    # suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestCompanionService))
+    suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestCompanionService))
     # suite.addTests(unittest.TestLoader().loadTestsFromTestCase(TestConnectionService))
     
     # Add Model Tests

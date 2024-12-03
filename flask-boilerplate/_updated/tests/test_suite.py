@@ -30,12 +30,12 @@ def run_tests_with_coverage():
         'def __repr__',
         'if self\\.debug',
         'raise AssertionError',
-        # 'raise NotImplementedError',
+        'raise NotImplementedError',
         r'^import .*$',
         r'^from .* import .*$',
-        # r'^class .*\(.*\):$',
-        # r'@.*',
-        # r'if TYPE_CHECKING:',
+        'class .*\bProtocol\)',
+        '@(abc\.)?abstractmethod',
+        r'if TYPE_CHECKING:',
         # r'^[a-zA-Z_][a-zA-Z0-9_]* *: *[a-zA-Z_][a-zA-Z0-9_]* *$',
     ])
 

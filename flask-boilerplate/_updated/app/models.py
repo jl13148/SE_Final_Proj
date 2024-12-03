@@ -11,6 +11,7 @@ from sqlalchemy import event
 from sqlalchemy.engine import Engine
 from sqlalchemy import String, Integer, Enum as SQLAlchemyEnum 
 from .extensions import db
+from sqlalchemy import CheckConstraint
 
 # db = SQLAlchemy()
 
@@ -182,11 +183,17 @@ class GlucoseRecord(db.Model):
     
     id = db.Column(db.Integer, primary_key=True)
     glucose_level = db.Column(db.Integer, nullable=False)
-    glucose_type = db.Column(SQLAlchemyEnum(GlucoseType), nullable=False)
+    glucose_type = db.Column(SQLAlchemyEnum(GlucoseType, native_enum=False), nullable=False)
     date = db.Column(db.String(10), nullable=False)
     time = db.Column(db.String(5), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     
+    __table_args__ = (
+        CheckConstraint('glucose_level >= 50 AND glucose_level <= 350', name='check_glucose_level'),
+        # Optional: Unique constraint to prevent duplicate records
+        # db.UniqueConstraint('user_id', 'date', 'time', name='uix_user_date_time_glucose')
+    )
+
     def __repr__(self):
         return f'<GlucoseRecord {self.glucose_level} mg/dL - {self.glucose_type.value}>'
 
@@ -199,6 +206,13 @@ class BloodPressureRecord(db.Model):
     date = db.Column(db.String(10), nullable=False)
     time = db.Column(db.String(5), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+
+    __table_args__ = (
+        CheckConstraint('systolic >= 50 AND systolic <= 300', name='check_systolic'),
+        CheckConstraint('diastolic >= 30 AND diastolic <= 200', name='check_diastolic'),
+        # Optional: Unique constraint to prevent duplicate records
+        # db.UniqueConstraint('user_id', 'date', 'time', name='uix_user_date_time')
+    )
     
     def __repr__(self):
         return f'<BloodPressureRecord {self.systolic}/{self.diastolic}>'
