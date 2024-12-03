@@ -69,8 +69,15 @@
                             <li class="nav-item">
                                 <a class="nav-link" href="{{ url_for('companion.companion_patients') }}">My Patients</a>
                             </li>
-                            <li class="nav-item">
-                                <a class="nav-link" href="{{ url_for('companion.view_notifications') }}">Notifications</a>
+                            <li class="nav-item position-relative">
+                                <a class="nav-link" href="{{ url_for('companion.view_notifications') }}">
+                                    <i class="fas fa-bell"></i> Notifications
+                                    {% if notifications_count > 0 %}
+                                        <span class="badge badge-danger position-absolute" style="top: 0; right: 0;">
+                                            {{ notifications_count }}
+                                        </span>
+                                    {% endif %}
+                                </a>
                             </li>
                         {% endif %}
                     {% endif %}

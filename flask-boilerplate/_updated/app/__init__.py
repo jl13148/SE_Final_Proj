@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, current_app
 from flask_login import current_user
 from .extensions import db, migrate, login_manager
 from .models import User, CompanionAccess
@@ -69,6 +69,17 @@ def create_app(config_name=None):
                 blood_pressure_access="NONE"
             ).count()
         return dict(pending_connections_count=get_pending_connections_count())
+    
+    @app.context_processor
+    def inject_notification_count():
+        """
+        Injects 'notifications_count' into the template context for companion users.
+        """
+        notifications_count = 0
+        if current_user.is_authenticated and current_user.user_type == "COMPANION":
+            success, notifications = current_app.companion_service.get_notifications(current_user.id)
+            notifications_count = len(notifications) if success else 0
+        return {'notifications_count': notifications_count}
 
     # Configure Flask-Login
     @login_manager.user_loader
