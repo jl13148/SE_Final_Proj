@@ -1,46 +1,21 @@
-<!-- pages/csv_exportation.html -->
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Export Health Data as CSV</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
-</head>
-<body>
-    <div class="container mt-5">
-        <h1>Export Health Data as CSV</h1>
-        <p>Click the button below to export your health data in CSV format.</p>
+{% extends 'layouts/main.html' %}
+{% block title %}Export Health Data as CSV - DiabetesEase{% endblock %}
 
-        <!-- Export CSV Form -->
-        <form action="{{ url_for('report.export_csv') }}" method="post">
-            <button type="submit" class="btn btn-primary">Export Data</button>
-        </form>
+{% block content %}
+<div class="container mt-5">
+    <h1>Export Health Data as CSV</h1>
+    <p>Click the button below to export your health data in CSV format.</p>
 
-        <!-- Link to download the generated CSV report -->
-        <div class="mt-4">
-            <a href="{{ url_for('report.download_csv_direct') }}">
-                <button class="btn btn-success">Download CSV</button>
-            </a>
-        </div>
+    <!-- Export CSV Form -->
+    <form action="{{ url_for('report.export_csv') }}" method="post">
+        <button type="submit" class="btn btn-primary">Export Data</button>
+    </form>
+
+    <!-- Link to download the generated CSV report -->
+    <div class="mt-4">
+        <a href="{{ url_for('report.download_csv_direct') }}">
+            <button type="button" class="btn btn-success">Download CSV</button>
+        </a>
     </div>
-
-    <!-- Include necessary JavaScript -->
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.bundle.min.js"></script>
-
-    <!-- Messages for User Feedback -->
-    {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-            <div class="container mt-4">
-                {% for category, message in messages %}
-                    <div class="alert alert-{{ category }}" role="alert">
-                        {{ message }}
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-    {% endwith %}
-</body>
-</html>
+</div>
+{% endblock %}
