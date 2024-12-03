@@ -1,27 +1,28 @@
+# tests/test_suite.py
 import unittest
 import coverage
 import sys
 import os
+import webbrowser
 
 def run_tests_with_coverage():
     """Run tests with coverage reporting"""
     # Start coverage
     cov = coverage.Coverage(
         branch=True,
-        include=[
-            'app/*',
-            'app/controllers/*',
-            'app/services/*',
-            'app/models/*'
-        ],
+        source=['app'],  # Use source instead of include
         omit=[
-            'tests/*', 
+            'tests/*',
+            'app/forms.py',
+            'app/extensions.py',
             'app/templates/*',
-            'app/static/*'
+            'app/static/*',
+            '*/__pycache__/*',
+            '*.pyc'
         ]
     )
     cov.start()
-    
+
     # Create test suite
     loader = unittest.TestLoader()
     start_dir = os.path.dirname(os.path.abspath(__file__))
@@ -35,15 +36,15 @@ def run_tests_with_coverage():
     cov.stop()
     cov.save()
 
-    # Print coverage report
+    # Print coverage report with more detail
     print('\nCoverage Summary:')
-    cov.report()
+    cov.report(show_missing=True)  # Show which lines are missing
 
     # Generate HTML report
     html_report_dir = os.path.join(start_dir, 'htmlcov')
     cov.html_report(directory=html_report_dir)
     print(f'\nHTML coverage report generated in: {html_report_dir}')
-    
+
     # Try to open the report in browser
     try:
         index_path = os.path.join(html_report_dir, 'index.html')
