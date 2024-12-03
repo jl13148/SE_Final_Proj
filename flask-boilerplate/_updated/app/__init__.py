@@ -4,13 +4,13 @@ from .extensions import db, migrate, login_manager
 from .models import User, CompanionAccess
 
 # Import blueprints
-from .controllers.auth import auth as auth_blueprint
-from .controllers.health import health as health_blueprint
-from .controllers.medication import medication as medication_blueprint
-from .controllers.pages import pages as pages_blueprint
-from .controllers.report import report as report_blueprint
-from .controllers.connection import connection as connection_blueprint
-from .controllers.companion import companion as companion_blueprint
+from .view.auth import auth as auth_blueprint
+from .view.health import health as health_blueprint
+from .view.medication import medication as medication_blueprint
+from .view.pages import pages as pages_blueprint
+from .view.report import report as report_blueprint
+from .view.connection import connection as connection_blueprint
+from .view.companion import companion as companion_blueprint
 
 # Import services
 from .services.auth_service import AuthService

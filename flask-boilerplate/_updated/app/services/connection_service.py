@@ -66,11 +66,11 @@ class ConnectionService:
         try:
             connection = CompanionAccess.query.get_or_404(connection_id)
             if connection.patient_id != patient_id:
-                return False, None, "Unauthorized access"
+                return False, "Unauthorized access"
             
             self.db.session.delete(connection)
             self.db.session.commit()
-            return True, None, None
+            return True, None
         except Exception as e:
             self.db.session.rollback()
-            return False, None, str(e)
+            return False, str(e)

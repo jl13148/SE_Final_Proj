@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch, MagicMock
 from flask import Flask
 from flask_login import LoginManager, UserMixin
-from app.controllers.report import report
+from app.view.report import report
 from app.services.report_service import ReportService
 from io import BytesIO
 import os
