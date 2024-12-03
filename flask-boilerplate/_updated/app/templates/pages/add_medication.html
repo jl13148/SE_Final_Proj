@@ -57,19 +57,6 @@
                         {% endfor %}
                     {% endif %}
                 </div>
-                
-                <div class="form-field">
-                    <div class="field-label">
-                        <span class="emoji">📅</span>
-                        Frequency
-                    </div>
-                    {{ form.frequency(class="field-input") }}
-                    {% if form.frequency.errors %}
-                        {% for error in form.frequency.errors %}
-                            <span class="error-text">{{ error }}</span>
-                        {% endfor %}
-                    {% endif %}
-                </div>
             </div>
 
             <div class="form-actions">

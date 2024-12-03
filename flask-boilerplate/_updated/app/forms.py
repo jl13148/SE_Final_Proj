@@ -56,13 +56,7 @@ class ForgotForm(Form):
 class MedicationForm(FlaskForm):
     name = StringField('Medication Name', validators=[DataRequired()])
     dosage = StringField('Dosage', validators=[DataRequired()])
-    frequency = SelectField('Frequency', 
-                          choices=[
-                              ('daily', 'Once Daily'),
-                              ('twice_daily', 'Twice Daily'),
-                              ('three_times_daily', 'Three Times Daily')
-                          ],
-                          validators=[DataRequired()])
+    frequency = StringField('Frequency', default='daily')
     time = TimeField('Time', validators=[DataRequired()])
     submit = SubmitField('Save Medication')
 
