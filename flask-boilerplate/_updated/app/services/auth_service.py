@@ -23,7 +23,7 @@ class AuthService:
 
             # Determine redirect for companion users
             redirect_url = None
-            if user.user_type == 'companion' and not user.patients:
+            if user.user_type == 'COMPANION' and not user.patients:
                 redirect_url = 'companion.companion_setup'
                 
             return True, user, redirect_url, None
