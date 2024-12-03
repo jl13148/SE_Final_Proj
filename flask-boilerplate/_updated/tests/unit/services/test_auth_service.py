@@ -79,7 +79,7 @@ class TestAuthService(BaseTestCase):
         companion = User(
             username=f'companion_{unique_id}',
             email=companion_email,
-            user_type=UserType.COMPANION  # Use the enum here
+            user_type='COMPANION'  # Ensure consistency with authenticate_user
         )
         companion.set_password('password123')
         db.session.add(companion)
@@ -89,7 +89,7 @@ class TestAuthService(BaseTestCase):
         success, user, redirect_url, error = self.auth_service.authenticate_user(
             email=companion_email,
             password='password123',
-            user_type=UserType.COMPANION  # Use the enum here
+            user_type='COMPANION'  # Ensure consistency here as well
         )
         
         # Assertions
@@ -100,8 +100,9 @@ class TestAuthService(BaseTestCase):
 
         # Additional Assertions (Optional)
         self.assertEqual(user.email, companion_email, "Authenticated user email should match")
-        self.assertEqual(user.user_type, UserType.COMPANION, "User type should be 'COMPANION'")
-        self.assertFalse(user.patients.count(), "User should have no patients")
+        self.assertEqual(user.user_type, 'COMPANION', "User type should be 'COMPANION'")
+        self.assertFalse(user.patients, "User should have no patients")
+
     def test_register_user_success_patient(self):
         """Test successful patient registration"""
         unique_id = str(uuid.uuid4())[:8]
