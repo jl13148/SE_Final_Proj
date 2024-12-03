@@ -56,7 +56,7 @@ class AuthService:
             self.db.session.commit()
             
             # Determine redirect path
-            redirect_url = 'companion.companion_setup' if user_type == 'COMPANION' else 'auth.login'
+            redirect_url = 'auth.login'
             
             return True, user, redirect_url, None
             
