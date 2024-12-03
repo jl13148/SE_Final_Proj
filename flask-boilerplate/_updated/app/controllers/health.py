@@ -81,20 +81,31 @@ def edit_glucose_record(record_id):
         except ValueError:
             flash('Invalid input. Please check your entries.', 'danger')
             return render_template('pages/edit_glucose_record.html', record=record)
+        
+        try:
+            glucose_type = GlucoseType(request.form['glucose_type'])
+        except ValueError:
+            flash('Invalid glucose type.', 'danger')
+            return render_template('pages/edit_glucose_record.html', record=record)
 
         success, error = health_service.update_glucose_record(
             record_id=record_id,
             user_id=current_user.id,
             glucose_level=glucose_level,
+            glucose_type=glucose_type,
             date=date,
             time=time
         )
 
         if success:
             flash('Glucose record updated successfully!', 'success')
+            if current_user.user_type == 'COMPANION':
+                return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return redirect(url_for('health.glucose_records'))
         else:
             flash(f'Error updating record: {error}', 'danger')
+            if current_user.user_type == 'COMPANION':
+                return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return render_template('pages/edit_glucose_record.html', record=record)
 
     return render_template('pages/edit_glucose_record.html', record=record)
@@ -111,6 +122,8 @@ def delete_glucose_record(record_id):
         flash('Glucose record deleted successfully.', 'success')
     else:
         flash(f'Error deleting record: {error}', 'danger')
+    if current_user.user_type == 'COMPANION':
+        return redirect(url_for('companion.view_patient_data', patient_id=current_user.id))
     return redirect(url_for('health.glucose_records'))
 
 @health.route('/blood_pressure/logger', methods=['GET', 'POST'])
@@ -194,11 +207,20 @@ def edit_blood_pressure_record(record_id):
             time=time
         )
 
+        # For 'blood_pressure', expect {'systolic': int, 'diastolic': int}.
+        data_type = 'blood_pressure'
+        value = {'systolic': systolic, 'diastolic': diastolic}
+
+        
         if success:
             flash('Blood pressure record updated successfully!', 'success')
+            if current_user.user_type == 'COMPANION':
+                return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return redirect(url_for('health.blood_pressure_records'))
         else:
             flash(f'Error updating record: {error}', 'danger')
+            if current_user.user_type == 'COMPANION':
+                return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return render_template('pages/edit_blood_pressure_record.html', record=record)
 
     return render_template('pages/edit_blood_pressure_record.html', record=record)
@@ -215,4 +237,6 @@ def delete_blood_pressure_record(record_id):
         flash('Blood pressure record deleted successfully.', 'success')
     else:
         flash(f'Error deleting record: {error}', 'danger')
+    if current_user.user_type == 'COMPANION':
+        return redirect(url_for('companion.view_patient_data', patient_id=current_user.id))
     return redirect(url_for('health.blood_pressure_records'))
