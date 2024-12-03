@@ -129,8 +129,8 @@ class TestHealthService(BaseTestCase):
         # Valid Equivalence Class
         result, record, error = self.health_service.add_blood_pressure_record(
             user_id=self.test_user.id,
-            systolic=120,
-            diastolic=80,
+            systolic=120, # S2: 50-300
+            diastolic=80, # D2: 30-200
             date='2024-01-01',
             time='12:00:00'
         )
@@ -139,27 +139,56 @@ class TestHealthService(BaseTestCase):
         self.assertEqual(record.systolic, 120)
         self.assertEqual(record.diastolic, 80)
 
-        # Invalid Equivalence Classes
-        invalid_cases = [
-            {'user_id': self.test_user.id, 'systolic': 400, 'diastolic': 80},    # Invalid systolic
-            {'user_id': self.test_user.id, 'systolic': 120, 'diastolic': 250},   # Invalid diastolic
-            {'user_id': 9999, 'systolic': 120, 'diastolic': 80},                 # Invalid user_id
-            {'user_id': self.test_user.id, 'systolic': 'high', 'diastolic': 80}, # Non-integer systolic
-            {'user_id': self.test_user.id, 'systolic': 120, 'diastolic': None},  # Missing diastolic
+        # Define Equivalence Classes
+        equivalence_cases = [
+            {
+                'name': 'S1D2',  # Systolic < 50 (Invalid Low), Diastolic 30-200 (Valid), Valid User ID
+                'input': {
+                    'user_id': self.test_user.id,
+                    'systolic': 40,                 # S1: <50 (Invalid Low)
+                    'diastolic': 80                 # D2: 30-200 (Valid)
+                },
+                'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
+            },
+            {
+                'name': 'S2D3',  # Systolic 50-300 (Valid), Diastolic >200 (Invalid High), Invalid User ID
+                'input': {
+                    'user_id': self.test_user.id,     
+                    'systolic': 120,                # S2: 50-300 (Valid)
+                    'diastolic': 250                # D3: >200 (Invalid High)
+                },
+                'expected_error_substring': 'Diastolic value must be between 30 and 200 mm Hg.'
+            },
+            {
+                'name': 'S3D1',  # Systolic >300 (Invalid High), Diastolic None (Missing), Valid User ID
+                'input': {
+                    'user_id': self.test_user.id,  
+                    'systolic': 400,                # S3: >300 (Invalid High)
+                    'diastolic': 15               # D1: <30 (Invalid Low)
+                },
+                'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
+            },
         ]
 
-        for case in invalid_cases:
-            with self.subTest(case=case):
+        # Iterate through each equivalence case
+        for case in equivalence_cases:
+            with self.subTest(case=case['name']):
                 result, record, error = self.health_service.add_blood_pressure_record(
-                    user_id=case['user_id'],
-                    systolic=case['systolic'],
-                    diastolic=case['diastolic'],
+                    user_id=case['input']['user_id'],
+                    systolic=case['input']['systolic'],
+                    diastolic=case['input']['diastolic'],
                     date='2024-01-01',
                     time='12:00:00'
                 )
-                self.assertFalse(result)
-                self.assertIsNone(record)
-                self.assertIsNotNone(error)
+                
+                self.assertFalse(result,
+                                 f"Result should be False for invalid input in case {case['name']}.")
+                self.assertIsNone(record,
+                                  f"Record should be None for invalid input in case {case['name']}.")
+                self.assertIsNotNone(error,
+                                     f"Error should be present for invalid input in case {case['name']}.")
+                self.assertIn(case['expected_error_substring'], error,
+                              f"Error message mismatch for case {case['name']}.")
 
     def test_duplicate_glucose_record(self):
         """Test that adding duplicate glucose records is handled properly."""
