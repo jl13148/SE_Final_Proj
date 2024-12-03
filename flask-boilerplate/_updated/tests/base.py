@@ -1,3 +1,4 @@
+# tests/base.py
 import unittest
 from datetime import time
 from app import create_app
@@ -8,9 +9,10 @@ class BaseTestCase(unittest.TestCase):
     """Base test case with common setup and teardown"""
     
     def setUp(self):
+        """Set up test environment"""
         self.app = create_app('testing')
         self.app_context = self.app.app_context()
-        self.app_context.push()
+        self.app_context.push()  # Push application context
         
         # Get test client
         self.client = self.app.test_client()
@@ -25,9 +27,10 @@ class BaseTestCase(unittest.TestCase):
         self.test_medication = self.create_test_medication('Test Med')
 
     def tearDown(self):
+        """Clean up after tests"""
         db.session.remove()
         db.drop_all()
-        self.app_context.pop()
+        self.app_context.pop()  # Pop application context
 
     def create_test_user(self, email):
         """Helper method to create test user"""
@@ -44,23 +47,15 @@ class BaseTestCase(unittest.TestCase):
     def create_test_medication(self, name, test_time=None):
         """Helper method to create test medication"""
         if test_time is None:
-            test_time = time(8, 0)  # Default time
+            test_time = time(8, 0)
             
         medication = Medication(
             name=name,
             dosage='100mg',
             frequency='daily',
-            time=test_time,  # Use test_time here
+            time=test_time,
             user_id=self.test_user.id
         )
         db.session.add(medication)
         db.session.commit()
         return medication
-
-    def login(self, email='test@test.com', password='password123'):
-        """Helper method to login"""
-        return self.client.post('/login', data={
-            'email': email,
-            'password': password,
-            'user_type': 'PATIENT'
-        }, follow_redirects=True)

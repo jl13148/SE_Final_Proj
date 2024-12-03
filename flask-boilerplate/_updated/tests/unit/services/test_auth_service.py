@@ -4,7 +4,6 @@ from tests.base import BaseTestCase
 from app.services.auth_service import AuthService
 from app.models import User
 from app.extensions import db
-from models import UserType
 import uuid
 
 class TestAuthService(BaseTestCase):
