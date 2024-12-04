@@ -161,6 +161,8 @@ class HealthService:
                     self.db.session.add(notification)
 
             self.db.session.commit()
+        
+        return messages
     #------------------------------------------
 
 
@@ -206,14 +208,14 @@ class GlucoseManager:
 
             value = {'glucose_level': glucose_level}
             data_type = 'fasting_glucose' if glucose_type == 'FASTING' else 'postprandial_glucose'
-            self.health_service.notify_companions(user_id, data_type, value)
+            msg = self.health_service.notify_companions(user_id, data_type, value)
 
             self.db.session.add(record)
             self.db.session.commit()
-            return True, record, None
+            return True, record, None, msg
         except Exception as e:
             self.db.session.rollback()
-            return False, None, str(e)
+            return False, None, str(e), []
 
     def update_glucose_record(self, record_id, user_id, glucose_level, glucose_type, date, time):
         """
@@ -242,12 +244,12 @@ class GlucoseManager:
             record.time = time
             value = {'glucose_level': glucose_level}
             data_type = 'fasting_glucose' if glucose_type == GlucoseType.FASTING else 'postprandial_glucose'
-            self.health_service.notify_companions(user_id, data_type, value)
+            msg = self.health_service.notify_companions(user_id, data_type, value)
             self.db.session.commit()
-            return True, None
+            return True, None, msg
         except Exception as e:
             self.db.session.rollback()
-            return False, str(e)
+            return False, str(e), []
 
     def delete_glucose_record(self, record_id, user_id):
         """
@@ -333,14 +335,14 @@ class BloodPressureManager:
             )
 
             value = {'systolic': systolic, 'diastolic': diastolic}
-            self.health_service.notify_companions(user_id, 'blood_pressure', value)
+            msg = self.health_service.notify_companions(user_id, 'blood_pressure', value)
 
             self.db.session.add(record)
             self.db.session.commit()
-            return True, record, None
+            return True, record, None, msg
         except Exception as e:
             self.db.session.rollback()
-            return False, None, str(e)
+            return False, None, str(e), []
 
     def update_blood_pressure_record(self, record_id, user_id, systolic, diastolic, date, time):
         """
@@ -372,12 +374,12 @@ class BloodPressureManager:
             record.date = date
             record.time = time
             value = {'systolic': systolic, 'diastolic': diastolic}
-            self.health_service.notify_companions(user_id, 'blood_pressure', value)
+            msg = self.health_service.notify_companions(user_id, 'blood_pressure', value)
             self.db.session.commit()
-            return True, None
+            return True, None, msg
         except Exception as e:
             self.db.session.rollback()
-            return False, str(e)
+            return False, str(e), []
 
     def delete_blood_pressure_record(self, record_id, user_id):
         """

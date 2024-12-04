@@ -28,7 +28,7 @@ def glucose_logger():
             flash('Invalid input. Please check your entries.', 'danger')
             return render_template('pages/glucose_logger.html')
 
-        success, record, error = health_service.add_glucose_record(
+        success, record, error, msg = health_service.add_glucose_record(
             user_id=current_user.id,
             glucose_level=glucose_level,
             glucose_type=glucose_type,
@@ -38,6 +38,8 @@ def glucose_logger():
 
         if success:
             flash('Glucose record added successfully!', 'success')
+            if msg:
+                flash(f"DANGER!!! {msg[0]}", 'warning')
             return redirect(url_for('health.glucose_records'))
         else:
             flash(f'Error adding glucose record: {error}', 'danger')
@@ -88,7 +90,7 @@ def edit_glucose_record(record_id):
             flash('Invalid glucose type.', 'danger')
             return render_template('pages/edit_glucose_record.html', record=record)
 
-        success, error = health_service.update_glucose_record(
+        success, error, msg = health_service.update_glucose_record(
             record_id=record_id,
             user_id=current_user.id,
             glucose_level=glucose_level,
@@ -99,6 +101,8 @@ def edit_glucose_record(record_id):
 
         if success:
             flash('Glucose record updated successfully!', 'success')
+            if msg:
+                flash(f"DANGER!!! {msg[0]}", 'warning')
             if current_user.user_type == 'COMPANION':
                 return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return redirect(url_for('health.glucose_records'))
@@ -143,7 +147,7 @@ def blood_pressure_logger():
             flash('Invalid input. Please check your entries.', 'danger')
             return render_template('pages/blood_pressure_logger.html')
 
-        success, record, error = health_service.add_blood_pressure_record(
+        success, record, error, msg = health_service.add_blood_pressure_record(
             user_id=current_user.id,
             systolic=systolic,
             diastolic=diastolic,
@@ -153,6 +157,8 @@ def blood_pressure_logger():
 
         if success:
             flash('Blood pressure record added successfully!', 'success')
+            if msg:
+                flash(f"DANGER!!! {msg[0]}", 'warning')
             return redirect(url_for('health.blood_pressure_records'))
         else:
             flash(f'Error adding blood pressure record: {error}', 'danger')
@@ -198,7 +204,7 @@ def edit_blood_pressure_record(record_id):
             flash('Invalid input. Please check your entries.', 'danger')
             return render_template('pages/edit_blood_pressure_record.html', record=record)
 
-        success, error = health_service.update_blood_pressure_record(
+        success, error, msg = health_service.update_blood_pressure_record(
             record_id=record_id,
             user_id=current_user.id,
             systolic=systolic,
@@ -214,6 +220,8 @@ def edit_blood_pressure_record(record_id):
         
         if success:
             flash('Blood pressure record updated successfully!', 'success')
+            if msg:
+                flash(f"DANGER!!! {msg[0]}", 'warning')
             if current_user.user_type == 'COMPANION':
                 return redirect(url_for('companion.view_patient_data', patient_id=record.user_id))
             return redirect(url_for('health.blood_pressure_records'))
