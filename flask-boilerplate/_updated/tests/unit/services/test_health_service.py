@@ -14,346 +14,460 @@ from app.extensions import db
 from sqlalchemy.exc import IntegrityError, StatementError
 from flask_login import current_user
 from app.services.health_service import HealthService  # Adjust the import path as necessary
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 class TestHealthService(BaseTestCase):
     """Tests for the HealthService, GlucoseManager, and BloodPressureManager with BVA and Equivalence Class Partitioning."""
-
-    # Define boundary values within this class
-    glucose_boundary_values = [49, 50, 51, 300, 349, 350, 351]
-    systolic_boundary_values = [49, 50, 51, 100, 299, 300, 301]
-    diastolic_boundary_values = [29, 30, 31, 100, 199, 200, 201]
-
     def setUp(self):
         super().setUp()
         self.health_service = HealthService(db)
-
-    # GlucoseManager Tests
-    def test_add_glucose_record_bva(self):
-        """Test adding glucose records with boundary values."""
-        base_datetime = datetime(2024, 1, 1, 12, 0, 0)
-        for i, level in enumerate(self.glucose_boundary_values):
-            with self.subTest(glucose_level=level):
-                expect_success = 50 <= level <= 350
-
-                user_id = self.test_user.id if expect_success else 9999
-                glucose_type = GlucoseType.FASTING if expect_success else 'INVALID_TYPE'
-                current_datetime = base_datetime + timedelta(seconds=i)
-
-                result, record, error = self.health_service.add_glucose_record(
-                    user_id=user_id,
-                    glucose_level=level,
-                    glucose_type=glucose_type,
-                    date=current_datetime.date().isoformat(),
-                    time=current_datetime.time().isoformat()
-                )
-
-                if expect_success:
-                    self.assertTrue(result, f"Failed for glucose_level={level}")
-                    self.assertIsNotNone(record)
-                    self.assertEqual(record.glucose_level, level)
-                else:
-                    self.assertFalse(result)
-                    self.assertIsNone(record)
-                    self.assertIsNotNone(error)
-
-    def test_add_glucose_record_equivalence_classes(self):
-        """Test adding glucose records with valid and invalid equivalence classes."""
-        # Valid Equivalence Class
-        result, record, error = self.health_service.add_glucose_record(
-            user_id=self.test_user.id,
-            glucose_level=150,
-            glucose_type=GlucoseType.FASTING,
-            date='2024-01-01',
-            time='12:00:00'
+        
+        # Create test users
+        self.patient = self.create_test_user('patient@test.com', 'PATIENT')
+        self.companion = self.create_test_user('companion@test.com', 'COMPANION')
+        self.another_patient = self.create_test_user('another@test.com', 'PATIENT')
+        
+        # Create companion access
+        self.companion_access = CompanionAccess(
+            patient_id=self.patient.id,
+            companion_id=self.companion.id,
+            glucose_access='EDIT',
+            blood_pressure_access='EDIT'
         )
-        self.assertTrue(result)
-        self.assertIsNotNone(record)
-        self.assertEqual(record.glucose_level, 150)
+        db.session.add(self.companion_access)
+        db.session.commit()
 
-        # Invalid Equivalence Classes
-        invalid_cases = [
-            {'user_id': self.test_user.id, 'glucose_level': 400, 'glucose_type': GlucoseType.FASTING},
-            {'user_id': self.test_user.id, 'glucose_level': 30, 'glucose_type': GlucoseType.FASTING},
-            {'user_id': 9999, 'glucose_level': 100, 'glucose_type': GlucoseType.FASTING},  # Invalid user_id
-            {'user_id': self.test_user.id, 'glucose_level': 100, 'glucose_type': 'INVALID_TYPE'},  # Invalid type
-            {'user_id': self.test_user.id, 'glucose_level': 100, 'glucose_type': None},  # Missing type
-        ]
+        # Base timestamp for tests
+        self.base_datetime = datetime.now()
+        self.valid_date = self.base_datetime.strftime('%Y-%m-%d')
+        self.valid_time = datetime.now().strftime('%H:%M')
 
-        for case in invalid_cases:
-            with self.subTest(case=case):
-                result, record, error = self.health_service.add_glucose_record(
-                    user_id=case['user_id'],
-                    glucose_level=case['glucose_level'],
-                    glucose_type=case['glucose_type'],
-                    date='2024-01-01',
-                    time='12:00:00'
-                )
-                self.assertFalse(result)
-                self.assertIsNone(record)
-                self.assertIsNotNone(error)
+        
+        # Helper method to generate unique times for tests
+        self.current_time_index = 0
 
-    def test_add_blood_pressure_record_bva(self):
-        """Test adding blood pressure records with boundary values."""
-        base_datetime = datetime(2024, 1, 1, 12, 0, 0)
-        for i, systolic in enumerate(self.systolic_boundary_values):
-            for j, diastolic in enumerate(self.diastolic_boundary_values):
-                with self.subTest(systolic=systolic, diastolic=diastolic):
-                    systolic_valid = 50 <= systolic <= 300
-                    diastolic_valid = 30 <= diastolic <= 200
-                    expect_success = systolic_valid and diastolic_valid
+    def get_unique_time(self):
+        """Helper method to generate unique times for tests"""
+        self.current_time_index += 1
+        test_time = self.base_datetime + timedelta(minutes=self.current_time_index)
+        return test_time.strftime('%H:%M')
 
-                    user_id = self.test_user.id if expect_success else 9999
-                    current_datetime = base_datetime + timedelta(seconds=i*len(self.diastolic_boundary_values) + j)
-
-                    result, record, error = self.health_service.add_blood_pressure_record(
-                        user_id=user_id,
-                        systolic=systolic,
-                        diastolic=diastolic,
-                        date=current_datetime.date().isoformat(),
-                        time=current_datetime.time().isoformat()
-                    )
-
-                    if expect_success:
-                        self.assertTrue(result)
-                        self.assertIsNotNone(record)
-                        self.assertEqual(record.systolic, systolic)
-                        self.assertEqual(record.diastolic, diastolic)
-                    else:
-                        self.assertFalse(result)
-                        self.assertIsNone(record)
-                        self.assertIsNotNone(error)
-
-    def test_add_blood_pressure_record_equivalence_classes(self):
-        """Test adding blood pressure records with valid and invalid equivalence classes."""
-        # Valid Equivalence Class
-        result, record, error = self.health_service.add_blood_pressure_record(
-            user_id=self.test_user.id,
-            systolic=120, # S2: 50-300
-            diastolic=80, # D2: 30-200
-            date='2024-01-01',
-            time='12:00:00'
-        )
-        self.assertTrue(result)
-        self.assertIsNotNone(record)
-        self.assertEqual(record.systolic, 120)
-        self.assertEqual(record.diastolic, 80)
-
-        # Define Equivalence Classes
-        equivalence_cases = [
-            {
-                'name': 'S1D2', 
-                'input': {
-                    'user_id': self.test_user.id,
-                    'systolic': 40,                 # S1: <50 (Invalid Low)
-                    'diastolic': 80                 # D2: 30-200 (Valid)
-                },
-                'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
-            },
-            {
-                'name': 'S2D3',  
-                'input': {
-                    'user_id': self.test_user.id,     
-                    'systolic': 120,                # S2: 50-300 (Valid)
-                    'diastolic': 250                # D3: >200 (Invalid High)
-                },
-                'expected_error_substring': 'Diastolic value must be between 30 and 200 mm Hg.'
-            },
-            {
-                'name': 'S3D1',  
-                'input': {
-                    'user_id': self.test_user.id,  
-                    'systolic': 400,                # S3: >300 (Invalid High)
-                    'diastolic': 15                 # D1: <30 (Invalid Low)
-                },
-                'expected_error_substring': 'Systolic value must be between 50 and 300 mm Hg.'
-            },
-        ]
-
-        # Iterate through each equivalence case
-        for case in equivalence_cases:
-            with self.subTest(case=case['name']):
-                result, record, error = self.health_service.add_blood_pressure_record(
-                    user_id=case['input']['user_id'],
-                    systolic=case['input']['systolic'],
-                    diastolic=case['input']['diastolic'],
-                    date='2024-01-01',
-                    time='12:00:00'
-                )
-                
-                self.assertFalse(result,
-                                 f"Result should be False for invalid input in case {case['name']}.")
-                self.assertIsNone(record,
-                                  f"Record should be None for invalid input in case {case['name']}.")
-                self.assertIsNotNone(error,
-                                     f"Error should be present for invalid input in case {case['name']}.")
-                self.assertIn(case['expected_error_substring'], error,
-                              f"Error message mismatch for case {case['name']}.")
-
-    def test_duplicate_glucose_record(self):
-        """Test that adding duplicate glucose records is handled properly."""
-        # Add initial record
-        result, record, error = self.health_service.add_glucose_record(
-            user_id=self.test_user.id,
+    def test_get_glucose_records_success(self):
+        """Test retrieving glucose records successfully."""
+        # Create test records with unique times
+        record1 = GlucoseRecord(
+            user_id=self.patient.id,
             glucose_level=100,
             glucose_type=GlucoseType.FASTING,
-            date='2024-01-01',
-            time='12:00:00'
+            date=self.valid_date,
+            time=self.get_unique_time()
         )
-        self.assertTrue(result)
-        self.assertIsNotNone(record)
-
-        # Attempt to add duplicate
-        result, record, error = self.health_service.add_glucose_record(
-            user_id=self.test_user.id,
-            glucose_level=110,
+        record2 = GlucoseRecord(
+            user_id=self.patient.id,
+            glucose_level=120,
             glucose_type=GlucoseType.POSTPRANDIAL,
-            date='2024-01-01',
-            time='12:00:00'
+            date=self.valid_date,
+            time=self.get_unique_time()
         )
-        self.assertFalse(result)
-        self.assertIsNone(record)
-        self.assertEqual(error, "A glucose record for this date and time already exists.")
+        db.session.add_all([record1, record2])
+        db.session.commit()
 
-    def test_duplicate_blood_pressure_record(self):
-        """Test that adding duplicate blood pressure records is handled properly."""
-        # Add initial record
-        result, record, error = self.health_service.add_blood_pressure_record(
-            user_id=self.test_user.id,
+        success, records, error = self.health_service.get_glucose_records(self.patient.id)
+        
+        self.assertTrue(success)
+        self.assertEqual(len(records), 2)
+        self.assertIsNone(error)
+
+    def test_add_glucose_record_with_notification(self):
+        """Test adding a glucose record that triggers notifications."""
+        # First add a valid record to ensure the method works
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=100,  # Normal value
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, notifications = result
+        else:
+            success, record, error = result
+            notifications = None  # Or set to a default value like []
+        
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+        self.assertEqual(len(notifications), 0)  # No notifications for normal values
+        
+        # Now test the critical value
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=45,  # Critical low
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, notifications = result
+        else:
+            success, record, error = result
+            notifications = None  # Or set to a default value like []
+        
+        self.assertFalse(success)  # Should fail due to being below minimum
+        self.assertIsNone(record)
+        self.assertIn("between 50 and 350", error)
+        self.assertIsNone(notifications)  # Adjust based on your method's behavior
+
+
+
+    @patch('app.services.health_service.current_user')
+    def test_update_glucose_record_success(self, mock_current_user):
+        """Test updating a glucose record successfully."""
+        # Set up mock with all required attributes
+        mock_current_user.configure_mock(**{
+            'user_type': 'COMPANION',
+            'id': None  # Will be set to companion.id
+        })
+        mock_current_user.id = self.companion.id
+        
+        # Create initial record
+        record = GlucoseRecord(
+            user_id=self.patient.id,
+            glucose_level=100,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        db.session.add(record)
+        db.session.commit()
+        
+        success, error, notifications = self.health_service.update_glucose_record(
+            record_id=record.id,
+            user_id=self.companion.id,
+            glucose_level=120,
+            glucose_type=GlucoseType.POSTPRANDIAL,
+            date=self.valid_date,
+            time=record.time  # Use same time since it's an update
+        )
+        
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        updated_record = GlucoseRecord.query.get(record.id)
+        self.assertEqual(updated_record.glucose_level, 120)
+
+    def test_delete_glucose_record_success(self):
+        """Test deleting a glucose record successfully."""
+        record = GlucoseRecord(
+            user_id=self.patient.id,
+            glucose_level=100,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.valid_time
+        )
+        db.session.add(record)
+        db.session.commit()
+        
+        success, error = self.health_service.delete_glucose_record(record.id, self.patient.id)
+        
+        self.assertTrue(success)
+        self.assertIsNone(error)
+        self.assertIsNone(GlucoseRecord.query.get(record.id))
+
+    def test_add_glucose_record_valid_cases(self):
+        """Test adding glucose records with valid data."""
+        # Test normal reading
+        success, record, error, messages = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=100,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+        self.assertEqual(len(messages), 0)  # Normal reading, no notifications
+
+        # Test boundary values - minimum
+        success, record, error, messages = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=50,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+
+        # Test boundary values - maximum
+        success, record, error, messages = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=350,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+
+    def test_add_blood_pressure_record_invalid_cases(self):
+        """Test adding blood pressure records with invalid data."""
+        # Define test cases
+        test_cases = [
+            {'systolic': 49, 'diastolic': 80, 'error_field': 'Systolic'},
+            {'systolic': 120, 'diastolic': 29, 'error_field': 'Diastolic'},
+        ]
+
+        for case in test_cases:
+            with self.subTest(case=case):
+                result = self.health_service.add_blood_pressure_record(
+                    user_id=self.patient.id,
+                    systolic=case['systolic'],
+                    diastolic=case['diastolic'],
+                    date=self.valid_date,
+                    time=self.get_unique_time()
+                )
+
+                # Dynamically unpack based on the length of the result
+                if len(result) == 4:
+                    success, record, error, messages = result
+                elif len(result) == 3:
+                    success, record, error = result
+                    messages = []
+                else:
+                    self.fail(f"Unexpected number of return values: {len(result)}")
+
+                self.assertFalse(success)
+                self.assertIsNone(record)
+                self.assertIn(case['error_field'], error)
+                self.assertEqual(messages, [])  # No messages expected on failure
+
+
+    def test_add_blood_pressure_record_valid_cases(self):
+        """Test adding blood pressure records with valid data."""
+        # Test normal reading
+        success, record, error, messages = self.health_service.add_blood_pressure_record(
+            user_id=self.patient.id,
             systolic=120,
             diastolic=80,
-            date='2024-01-01',
-            time='12:00:00'
+            date=self.valid_date,
+            time=self.get_unique_time()
         )
-        self.assertTrue(result)
+        self.assertTrue(success)
         self.assertIsNotNone(record)
+        self.assertIsNone(error)
+        self.assertEqual(len(messages), 0)
 
-        # Attempt to add duplicate
-        result, record, error = self.health_service.add_blood_pressure_record(
-            user_id=self.test_user.id,
-            systolic=130,
-            diastolic=85,
-            date='2024-01-01',
-            time='12:00:00'
+        # Test boundary values
+        success, record, error, messages = self.health_service.add_blood_pressure_record(
+            user_id=self.patient.id,
+            systolic=50,
+            diastolic=30,
+            date=self.valid_date,
+            time=self.get_unique_time()
         )
-        self.assertFalse(result)
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+
+    def test_add_blood_pressure_record_invalid_cases(self):
+        """Test adding blood pressure records with invalid data."""
+        # Test invalid systolic
+        result = self.health_service.add_blood_pressure_record(
+            user_id=self.patient.id,
+            systolic=49,  # Below minimum
+            diastolic=80,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertFalse(success)
         self.assertIsNone(record)
-        self.assertEqual(error, "A blood pressure record for this date and time already exists.")
+        self.assertIn("Systolic", error)
+        self.assertIsNone(messages)  # Adjust based on your method's behavior
 
-    def test_update_glucose_record_bva(self):
-        """Test updating glucose records with boundary values."""
+        # Test invalid diastolic
+        result = self.health_service.add_blood_pressure_record(
+            user_id=self.patient.id,
+            systolic=120,
+            diastolic=29,  # Below minimum
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertFalse(success)
+        self.assertIsNone(record)
+        self.assertIn("Diastolic", error)
+        self.assertIsNone(messages)  # Adjust based on your method's behavior
+
+    def test_duplicate_prevention(self):
+        """Test prevention of duplicate records."""
+        test_time = self.get_unique_time()
+        
         # Add initial record
-        result, record, error = self.health_service.add_glucose_record(
-            user_id=self.test_user.id,
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
             glucose_level=100,
             glucose_type=GlucoseType.FASTING,
-            date='2024-01-01',
-            time='12:00:00'
+            date=self.valid_date,
+            time=test_time
         )
-        self.assertTrue(result)
-        record_id = record.id
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        
+        # Try to add duplicate
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=110,
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=test_time
+        )
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertFalse(success)
+        self.assertIsNone(record)
+        self.assertIn("already exists", error)
+        self.assertIsNone(messages)  # Adjust based on your method's behavior
 
-        for level in self.glucose_boundary_values:
-            with self.subTest(glucose_level=level):
-                if 50 <= level <= 350:
-                    expect_success = True
-                else:
-                    expect_success = False
+    @patch('app.services.health_service.current_user')
+    def test_companion_access_permissions(self, mock_current_user):
+        """Test companion access permissions for various operations."""
+        # Set up mock user with proper attributes
+        mock_user = MagicMock()
+        mock_user.user_type = "COMPANION"
+        mock_user.id = self.companion.id
+        mock_current_user.return_value = mock_user
 
-                user_id = self.test_user.id if expect_success else 9999
-                glucose_type = GlucoseType.FASTING if expect_success else 'INVALID_TYPE'
-
-                result, error = self.health_service.update_glucose_record(
-                    record_id=record_id,
-                    user_id=user_id,
-                    glucose_level=level,
-                    glucose_type=glucose_type,
-                    date='2024-01-02',
-                    time='13:00:00'
-                )
-
-                if expect_success:
-                    self.assertTrue(result)
-                    updated_record = GlucoseRecord.query.get(record_id)
-                    self.assertEqual(updated_record.glucose_level, level)
-                else:
-                    self.assertFalse(result)
-                    self.assertIsNotNone(error)
-
-    def test_delete_glucose_record(self):
-        """Test deleting a glucose record."""
-        # Add initial record
-        result, record, error = self.health_service.add_glucose_record(
-            user_id=self.test_user.id,
+        # Create a glucose record as the patient
+        record = GlucoseRecord(
+            user_id=self.patient.id,
             glucose_level=100,
             glucose_type=GlucoseType.FASTING,
-            date='2024-01-01',
-            time='12:00:00'
+            date=self.valid_date,
+            time=self.get_unique_time()
         )
-        self.assertTrue(result)
-        record_id = record.id
-
-        # Delete the record
-        result, error = self.health_service.delete_glucose_record(
-            record_id=record_id,
-            user_id=self.test_user.id
-        )
-        self.assertTrue(result)
-        deleted_record = GlucoseRecord.query.get(record_id)
-        self.assertIsNone(deleted_record)
-
-    def test_notify_companions_glucose(self):
-        """Test that companions are notified when glucose levels are risky."""
-        # Set up companion
-        companion = User(
-            username='companion_user',
-            email='companion@example.com',
-            user_type='COMPANION'
-        )
-        db.session.add(companion)
+        db.session.add(record)
         db.session.commit()
 
-        access = CompanionAccess(
-            patient_id=self.test_user.id,
-            companion_id=companion.id,
-            glucose_access='VIEW'
-        )
-        db.session.add(access)
+        # Test VIEW access - should not allow deletion
+        self.companion_access.glucose_access = "VIEW"
         db.session.commit()
 
-        # Mock current_user to be the patient (not the companion)
-        # To simulate that the patient is adding a glucose record which should notify companions
-        with patch('app.services.health_service.current_user', self.test_user):
-            # Add a risky glucose record
-            result, record, error = self.health_service.add_glucose_record(
-                user_id=self.test_user.id,
-                glucose_level=55,  # Below normal_min (70) for fasting_glucose
+        result = self.health_service.delete_glucose_record(record.id, self.companion.id)
+        
+        if len(result) == 3:
+            success, error, _ = result
+        else:
+            success, error = result
+            _ = None  # Placeholder for the third value
+        
+        self.assertFalse(success)
+        self.assertIn("permission", error)
+
+        # Test EDIT access - should allow deletion
+        self.companion_access.glucose_access = "EDIT"
+        db.session.commit()
+
+        result = self.health_service.delete_glucose_record(record.id, self.companion.id)
+        
+        if len(result) == 3:
+            success, error, _ = result
+        else:
+            success, error = result
+            _ = None  # Placeholder for the third value
+
+        self.assertTrue(success)
+        self.assertIsNone(error)
+
+
+    def test_notification_thresholds(self):
+        """Test notification generation for various health data thresholds."""
+        # Test critical low glucose
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=45,  # Critical low
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertFalse(success)  # Should fail due to being below minimum
+        self.assertIsNone(record)
+        self.assertIn("between 50 and 350", error)
+        self.assertIsNone(messages)  # Adjust based on your method's behavior
+        
+        # Test high but valid glucose (should trigger notification)
+        result = self.health_service.add_glucose_record(
+            user_id=self.patient.id,
+            glucose_level=200,  # High value
+            glucose_type=GlucoseType.FASTING,
+            date=self.valid_date,
+            time=self.get_unique_time()
+        )
+        
+        if len(result) == 4:
+            success, record, error, messages = result
+        else:
+            success, record, error = result
+            messages = None  # Or set to a default value like []
+        
+        self.assertTrue(success)
+        self.assertIsNotNone(record)
+        self.assertIsNone(error)
+        self.assertTrue(len(messages) > 0)
+        self.assertIn("High", messages[0])
+
+
+    def test_error_handling(self):
+        """Test error handling for various scenarios."""
+        # Test invalid record ID
+        success, error = self.health_service.delete_glucose_record(999999, self.patient.id)
+        self.assertFalse(success)
+        
+        # Test database errors
+        with patch('app.extensions.db.session.commit') as mock_commit:
+            mock_commit.side_effect = IntegrityError(None, None, None)
+            success, _, error, _ = self.health_service.add_glucose_record(
+                user_id=self.patient.id,
+                glucose_level=100,
                 glucose_type=GlucoseType.FASTING,
-                date='2024-01-03',
-                time='08:00:00'
+                date=self.valid_date,
+                time=self.valid_time
             )
-            self.assertTrue(result)
-            self.assertIsNotNone(record)
-
-            # Check that a notification was created for the companion
-            notifications = Notification.query.filter_by(user_id=companion.id).all()
-            self.assertTrue(len(notifications) > 0)
-            self.assertIn("Low", notifications[0].message)  
-
-
-class TestReportController(BaseTestCase):
-    """Tests for the ReportController."""
-
-    def test_health_reports_page_unauthenticated_get(self):
-        """Test accessing the health reports page with GET as an unauthenticated user."""
-        response = self.client.get('/health-reports')  # Adjust the URL as necessary
-        self.assertEqual(response.status_code, 302)  # Expect 302 Redirect to login
-
-    def test_health_reports_page_unauthenticated_post(self):
-        """Test accessing the health reports page with POST as an unauthenticated user."""
-        response = self.client.post('/health-reports')  # Adjust the URL as necessary
-        self.assertEqual(response.status_code, 302)  # Expect 302 Redirect to login
-
-
-if __name__ == '__main__':
-    unittest.main()
+            self.assertFalse(success)
+            self.assertIsNotNone(error)

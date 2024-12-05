@@ -15,7 +15,7 @@ def run_tests_with_coverage():
             'tests/*',
             'app/forms.py',
             'app/models.py',
-            'app/controllers/*',
+            'app/view/*',
             'app/extensions.py',
             'app/templates/*',
             'app/static/*',
