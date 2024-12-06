@@ -17,7 +17,7 @@ Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplat
 
 2. **Initialize and activate a virtual environment**
     ```bash
-    conda create -n <venv-name> python=3.8
+    conda create -n <venv-name> python=3.9
     conda activate <venv-name>
     ```
 
