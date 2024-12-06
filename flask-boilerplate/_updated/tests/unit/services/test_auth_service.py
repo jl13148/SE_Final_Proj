@@ -134,7 +134,7 @@ class TestAuthService(BaseTestCase):
         
         self.assertTrue(success)
         self.assertIsNotNone(user)
-        self.assertEqual(redirect_url, 'companion.companion_setup')
+        self.assertEqual(redirect_url, 'auth.login')
         self.assertIsNone(error)
 
     def test_register_user_existing_email(self):

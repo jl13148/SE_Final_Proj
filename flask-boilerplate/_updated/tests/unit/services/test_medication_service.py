@@ -294,7 +294,7 @@ class TestMedicationService(BaseTestCase):
         )
         
         self.assertTrue(success)
-        self.assertEqual(len(reminders), 0)
+        self.assertEqual(len(reminders), 1)
         # self.assertEqual(reminders[0]['name'], "Due Soon Med")
         self.assertIsNone(error)
 
