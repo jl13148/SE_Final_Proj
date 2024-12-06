@@ -33,9 +33,6 @@ jobs:
           pip install -r requirements.txt
           pip install coverage coverage-badge
 
-      - name: Change to project directory
-        run: cd project
-
       - name: Run tests and generate coverage
         working-directory: ./project
         run: |
@@ -44,9 +41,9 @@ jobs:
           python -m coverage xml
 
       - name: Generate Coverage Badge
+        working-directory: ./project
         run: |
-          mkdir -p .github/badges
-          cd project
+          mkdir -p ../.github/badges
           coverage-badge -f -o ../.github/badges/coverage.svg
 
       - name: Log coverage percentage
@@ -56,6 +53,7 @@ jobs:
 
       - name: Commit the badge (if it changed)
         run: |
+          cd ${GITHUB_WORKSPACE}
           if [[ `git status --porcelain` ]]; then
             git config --global user.name 'github-actions[bot]'
             git config --global user.email 'github-actions[bot]@users.noreply.github.com'
