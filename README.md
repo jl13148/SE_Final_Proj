@@ -12,7 +12,7 @@ Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplat
 1. **Clone the repository**
     ```bash
     git clone https://github.com/jl13148/SE_Final_Proj.git
-    cd project
+    cd SE_Final_Proj/project
     ```
 
 2. **Initialize and activate a virtual environment**
