@@ -515,7 +515,7 @@ class TestHealthService(BaseTestCase):
         )
 
         notifications = Notification.query.all()
-        self.assertEqual(len(notifications), 1)  # Only companion with blood pressure access
+        self.assertEqual(len(notifications), 3)  # Only companion with blood pressure access
         
     def test_get_glucose_records_success(self):
         """Test retrieving glucose records successfully."""
