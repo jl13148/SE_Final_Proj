@@ -25,6 +25,7 @@
    - Email address
    - Password
 4. Click "Sign Up"
+5. Automatically log in after first sign up
 
 ### Login
 1. Click "Login" in the navigation menu
@@ -41,7 +42,6 @@
    - Enter medication details:
      - Name
      - Dosage
-     - Frequency (Once daily, Twice daily, etc.)
      - Time
    - Click "Save Medication"
 3. To mark medications as taken:
