@@ -24,16 +24,15 @@ def login():
         )
         
         if success:
-            login_user(user, remember=form.remember.data)
+            flash('Your account has been created! You are now logged in.', 'success')
+            login_user(user)
             
-            # Handle specific redirect for companions
-            if redirect_url:
+            # Handle companion registration
+            if form.user_type.data == 'COMPANION':
+                login_user(user)
                 return redirect(url_for(redirect_url))
                 
-            # Handle next page redirect
-            next_page = request.args.get('next')
-            flash('Login successful!', 'success')
-            return redirect(next_page) if next_page else redirect(url_for('pages.home'))
+            return redirect(url_for(redirect_url))
         
         flash(error, 'danger')
     
