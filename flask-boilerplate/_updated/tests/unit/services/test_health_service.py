@@ -1375,6 +1375,50 @@ class TestHealthService(BaseTestCase):
         self.assertEqual(unchanged_record.glucose_level, 120)
         self.assertEqual(unchanged_record.time, time2)
 
+    def test_update_blood_pressure_record_duplicate_datetime(self):
+        """Test updating blood pressure record with duplicate date and time."""
+        # Create first record
+        time1 = self.get_unique_time()
+        record1 = BloodPressureRecord(
+            user_id=self.patient.id,
+            systolic=120,
+            diastolic=80,
+            date=self.valid_date,
+            time=time1
+        )
+        
+        # Create second record with different time
+        time2 = self.get_unique_time()
+        record2 = BloodPressureRecord(
+            user_id=self.patient.id,
+            systolic=130,
+            diastolic=85,
+            date=self.valid_date,
+            time=time2
+        )
+        
+        db.session.add_all([record1, record2])
+        db.session.commit()
+
+        # Try to update second record to use first record's date and time
+        success, error = self.health_service.update_blood_pressure_record(
+            record_id=record2.id,
+            user_id=self.patient.id,
+            systolic=140,
+            diastolic=90,
+            date=self.valid_date,
+            time=time1  # This would create a duplicate
+        )
+
+        self.assertFalse(success)
+        self.assertEqual(error, "A blood pressure record for this date and time already exists.")
+        
+        # Verify record2 wasn't changed
+        unchanged_record = BloodPressureRecord.query.get(record2.id)
+        self.assertEqual(unchanged_record.systolic, 130)
+        self.assertEqual(unchanged_record.diastolic, 85)
+        self.assertEqual(unchanged_record.time, time2)
+
     def test_update_glucose_record_nonexistent(self):
         """Test updating a non-existent glucose record."""
         success, error, msg = self.health_service.update_glucose_record(
