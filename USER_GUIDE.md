@@ -38,12 +38,12 @@
 ### Medication Management
 1. Click "Medications" in the navigation menu
 2. To add a new medication:
-   - Click "Add Medication"
+   - Click "Add New Medication"
    - Enter medication details:
      - Name
      - Dosage
      - Time
-   - Click "Save Medication"
+   - Click "Add Medication"
 3. To mark medications as taken:
    - Find the medication in your list
    - Click "Mark as Taken" to log completion
@@ -58,9 +58,10 @@
 1. Click "Health Logger" then "Glucose Records"
 2. To add a new reading:
    - Enter your glucose level (mg/dL)
+   - Choose glucose type
    - Select date and time
-   - Click "Save Record"
-3. View your glucose history in the table below
+   - Click "Submit"
+3. View your glucose history in the "Health Records" -> "Glucose Records"
 
 #### Blood Pressure Logging
 1. Click "Health Logger" then "Blood Pressure Records"
@@ -68,11 +69,11 @@
    - Enter systolic pressure (mm Hg)
    - Enter diastolic pressure (mm Hg)
    - Select date and time
-   - Click "Save Record"
-3. View your blood pressure history in the table below
+   - Click "Submit"
+3. View your blood pressure history in the "Health Records" -> "Blood Pressure Records"
 
 ### Health Reports
-1. Click "Reports" in the navigation menu
+1. Click "Export Data" in the navigation menu
 2. Choose your export format:
    - PDF: Comprehensive formatted report
    - CSV: Spreadsheet-compatible data
@@ -93,9 +94,9 @@
      - View Only: Can see records
      - Full Access: Can view and edit
    - Glucose Records:
-     - No Access/View Only/Full Access
+     - No Access/View Only/Full Access (Same as above)
    - Blood Pressure Records:
-     - No Access/View Only/Full Access
+     - No Access/View Only/Full Access (Same as above)
 2. Click "Update Access" to save changes
 
 ## Companion Features
@@ -127,10 +128,6 @@
 - **Blood Pressure**:
   - Systolic: 90-180 mm Hg
   - Diastolic: 60-120 mm Hg
-- **Medication Frequency Options**:
-  - Once Daily
-  - Twice Daily
-  - Three Times Daily
 
 ## Support
 For technical support or questions, please:
