@@ -1,0 +1,215 @@
+{% extends 'layouts/main.html' %}
+{% block title %}View Patient Data - {{ patient.username }}{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>{{ patient.username }}'s Health Data</h2>
+        <div class="badge bg-info text-white p-2">
+            Viewing as Companion
+        </div>
+    </div>
+
+    {% if access.medication_access == "NONE" and access.glucose_access == "NONE" and access.blood_pressure_access == "NONE" %}
+        <div class="alert alert-info">
+            <h4 class="alert-heading">Pending Access</h4>
+            <p>Your access request is pending approval from {{ patient.username }}.</p>
+        </div>
+    {% else %}
+        <!-- Medications Section -->
+        {% if access.medication_access != "NONE" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Medications</h5>
+                    <span class="badge {% if access.medication_access == 'EDIT' %}bg-success{% else %}bg-info{% endif %}">
+                        {{ access.medication_access }} Access
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if medication_data %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Medication</th>
+                                        <th>Dosage</th>
+                                        <th>Frequency</th>
+                                        <th>Time</th>
+                                        {% if access.medication_access == "EDIT" %}
+                                            <th>Actions</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for med in medication_data %}
+                                        <tr>
+                                            <td>{{ med.name }}</td>
+                                            <td>{{ med.dosage }}</td>
+                                            <td>{{ med.frequency }}</td>
+                                            <td>{{ med.time.strftime('%I:%M %p') }}</td>
+                                            {% if access.medication_access == "EDIT" %}
+                                                <td>
+                                                    <a href="{{ url_for('medication.edit_medication', id=med.id) }}" 
+                                                       class="btn btn-sm btn-primary">Edit</a>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="mb-0">No medications recorded.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Glucose Records Section -->
+        {% if access.glucose_access != "NONE" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Glucose Records</h5>
+                    <span class="badge {% if access.glucose_access == 'EDIT' %}bg-success{% else %}bg-info{% endif %}">
+                        {{ access.glucose_access }} Access
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if glucose_data %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Level (mg/dL)</th>
+                                        {% if access.glucose_access == "EDIT" %}
+                                            <th>Actions</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in glucose_data %}
+                                        <tr>
+                                            <td>{{ record.date }}</td>
+                                            <td>{{ record.time }}</td>
+                                            <td>{{ record.glucose_level }}</td>
+                                            {% if access.glucose_access == "EDIT" %}
+                                                <td>
+                                                    <a href="{{ url_for('health.edit_glucose_record', record_id=record.id) }}" 
+                                                       class="btn btn-sm btn-primary">Edit</a>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="mb-0">No glucose records available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Blood Pressure Records Section -->
+        {% if access.blood_pressure_access != "NONE" %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Blood Pressure Records</h5>
+                    <span class="badge {% if access.blood_pressure_access == 'EDIT' %}bg-success{% else %}bg-info{% endif %}">
+                        {{ access.blood_pressure_access }} Access
+                    </span>
+                </div>
+                <div class="card-body">
+                    {% if blood_pressure_data %}
+                        <div class="table-responsive">
+                            <table class="table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Time</th>
+                                        <th>Systolic</th>
+                                        <th>Diastolic</th>
+                                        {% if access.blood_pressure_access == "EDIT" %}
+                                            <th>Actions</th>
+                                        {% endif %}
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for record in blood_pressure_data %}
+                                        <tr>
+                                            <td>{{ record.date }}</td>
+                                            <td>{{ record.time }}</td>
+                                            <td>{{ record.systolic }}</td>
+                                            <td>{{ record.diastolic }}</td>
+                                            {% if access.blood_pressure_access == "EDIT" %}
+                                                <td>
+                                                    <a href="{{ url_for('health.edit_blood_pressure_record', record_id=record.id) }}" 
+                                                       class="btn btn-sm btn-primary">Edit</a>
+                                                </td>
+                                            {% endif %}
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    {% else %}
+                        <p class="mb-0">No blood pressure records available.</p>
+                    {% endif %}
+                </div>
+            </div>
+        {% endif %}
+
+        <!-- Export Section -->
+        {% if access.export_access %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0">Export Data</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex gap-2">
+                        <form action="{{ url_for('report.export_pdf') }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-pdf"></i> Export as PDF
+                            </button>
+                        </form>
+                        <form action="{{ url_for('report.export_csv') }}" method="POST" class="d-inline">
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-file-csv"></i> Export as CSV
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    {% endif %}
+</div>
+
+{% block extra_css %}
+<style>
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+}
+
+.table th {
+    background-color: #f8f9fa;
+}
+
+.card {
+    border: none;
+    box-shadow: 0 0 15px rgba(0,0,0,0.1);
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+</style>
+{% endblock %}
+{% endblock %}

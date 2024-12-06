@@ -1,0 +1,170 @@
+{% extends 'layouts/main.html' %}
+{% block title %}Manage Connections{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    {% if messages %}
+        {% for category, message in messages %}
+            <div class="alert alert-{{ category }} alert-dismissible fade show">
+                {{ message }}
+                <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+
+    <!-- Pending Requests Section -->
+    {% if pending_connections %}
+        <div class="card mb-4">
+            <div class="card-header bg-warning">
+                <h5 class="mb-0 text-white d-flex justify-content-between align-items-center">
+                    Pending Connection Requests
+                    <span class="badge bg-light text-dark">{{ pending_connections|length }}</span>
+                </h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for connection in pending_connections %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ connection.companion.username }}</h5>
+                                    <p class="card-text text-muted mb-3">
+                                        <i class="fas fa-envelope"></i> {{ connection.companion.email }}
+                                    </p>
+                                    <div class="d-flex justify-content-between">
+                                        <form action="{{ url_for('connection.approve_connection', connection_id=connection.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-success">
+                                                <i class="fas fa-check"></i> Accept
+                                            </button>
+                                        </form>
+                                        <form action="{{ url_for('connection.remove_connection', connection_id=connection.id) }}" 
+                                              method="POST" class="d-inline">
+                                            <button type="submit" class="btn btn-danger" 
+                                                    onclick="return confirm('Are you sure you want to decline this request?')">
+                                                <i class="fas fa-times"></i> Decline
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    <!-- Active Connections Section -->
+    {% if active_connections %}
+        <div class="card">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0">Active Connections</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    {% for connection in active_connections %}
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 shadow-sm">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ connection.companion.username }}</h5>
+                                    <p class="text-muted">{{ connection.companion.email }}</p>
+                                    
+                                    <h6 class="mt-3">Current Access Levels:</h6>
+                                    <ul class="list-unstyled">
+                                        <li>
+                                            <span class="badge {% if connection.medication_access == 'EDIT' %}bg-success{% elif connection.medication_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %} mb-1">
+                                                Medications: {{ connection.medication_access }}
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <span class="badge {% if connection.glucose_access == 'EDIT' %}bg-success{% elif connection.glucose_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %} mb-1">
+                                                Glucose: {{ connection.glucose_access }}
+                                            </span>
+                                        </li>
+                                        <li>
+                                            <span class="badge {% if connection.blood_pressure_access == 'EDIT' %}bg-success{% elif connection.blood_pressure_access == 'VIEW' %}bg-info{% else %}bg-secondary{% endif %} mb-1">
+                                                Blood Pressure: {{ connection.blood_pressure_access }}
+                                            </span>
+                                        </li>
+                                    </ul>
+                                    
+                                    <div class="mt-3">
+                                        <a href="{{ url_for('connection.update_access', connection_id=connection.id) }}" 
+                                           class="btn btn-primary btn-sm">
+                                            Modify Access
+                                        </a>
+                                        <button type="button" 
+                                                class="btn btn-danger btn-sm"
+                                                onclick="if(confirm('Remove this companion?')) document.getElementById('remove-form-{{ connection.id }}').submit()">
+                                            Remove
+                                        </button>
+                                        <form id="remove-form-{{ connection.id }}" 
+                                              action="{{ url_for('connection.remove_connection', connection_id=connection.id) }}" 
+                                              method="POST" style="display: none;">
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    {% endif %}
+
+    {% if not pending_connections and not active_connections %}
+        <div class="alert alert-info">
+            <h4 class="alert-heading">No Connections Yet</h4>
+            <p>You don't have any companion connections or pending requests.</p>
+            <hr>
+            <p class="mb-0">Share your email address with potential companions to get started.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.card {
+    border: none;
+    transition: transform 0.2s;
+}
+
+.card:hover {
+    transform: translateY(-5px);
+}
+
+.btn {
+    padding: 0.5rem 1rem;
+    font-weight: 500;
+}
+
+.badge {
+    font-size: 0.9rem;
+    padding: 0.5rem 1rem;
+    display: inline-block;
+    width: 100%;
+    text-align: left;
+}
+
+.card-header {
+    border-bottom: none;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+}
+
+.list-unstyled li {
+    margin-bottom: 0.5rem;
+}
+
+.fas {
+    margin-right: 0.5rem;
+}
+</style>
+{% endblock %}

@@ -1,0 +1,5 @@
+*.pyc
+.DS_Store
+env
+venv
+dev_database.dbflask-boilerplate/_updated/dev_database.db
