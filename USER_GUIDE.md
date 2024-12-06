@@ -132,5 +132,4 @@
 ## Support
 For technical support or questions, please:
 1. Open an issue on our GitHub repository
-2. Check our [FAQ section](FAQ.md) for common questions
 ```
