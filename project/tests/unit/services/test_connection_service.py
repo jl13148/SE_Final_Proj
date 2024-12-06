@@ -195,6 +195,8 @@ class TestConnectionService(BaseTestCase):
         self.assertIsNotNone(error)
 
 
+
+
     def test_update_access_levels_no_changes(self):
         """Test updating access levels with no changes"""
         # Create initial connection
@@ -246,5 +248,5 @@ class TestConnectionService(BaseTestCase):
             mock_query.filter_by.side_effect = Exception("Database error")
             success, pending_connections, error = self.connection_service.get_pending_connections(self.companion.id)
             self.assertFalse(success)
-            self.assertIsNone(pending_connections)
+            self.assertEqual(pending_connections, [])
             self.assertTrue(error.startswith('Database error'))
