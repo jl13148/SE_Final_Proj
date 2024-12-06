@@ -12,7 +12,7 @@ Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplat
 1. **Clone the repository**
     ```bash
     git clone https://github.com/jl13148/SE_Final_Proj.git
-    cd SE_Final_Proj/flask-boilerplate
+    cd project
     ```
 
 2. **Initialize and activate a virtual environment**
@@ -26,30 +26,32 @@ Code based on [flask-boilerplate](https://github.com/realpython/flask-boilerplat
     pip install -r requirements.txt
     ```
 
-4. **Run the development server**
+4. **Initialize the database**
     ```bash
-    python app.py
-    ```
-    or
-    ```bash
-    flask run
+    python manage.py init-db
+    python manage.py reset-db
     ```
 
-5. **Navigate to the application**
+5. **Run the development server**
+    ```bash
+    python run.py
+    ```
+
+6. **Navigate to the application**
     Open your web browser and go to [http://localhost:5000](http://localhost:5000)
 
 ## Testing
 
 To ensure that the application is functioning correctly, follow these steps to run the test suite and generate a coverage report:
 
-1. **Navigate to the flask-boilerplate directory**
+1. **Run the tests with coverage**
     ```bash
-    cd flask-boilerplate
+    coverage run -m unittest discover tests
     ```
 
-2. **Run the tests with coverage**
+2. **Show the coverage report in the terminal**
     ```bash
-    coverage run test_app.py
+    coverage report -m
     ```
 
 3. **Generate the coverage report in HTML format**
