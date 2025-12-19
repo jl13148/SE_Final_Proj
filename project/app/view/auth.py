@@ -30,9 +30,9 @@ def login():
             # Handle companion registration
             if form.user_type.data == 'COMPANION':
                 login_user(user)
-                return redirect(url_for(redirect_url))
+                return redirect(url_for(redirect_url or 'pages.home'))
                 
-            return redirect(url_for(redirect_url))
+            return redirect(url_for(redirect_url or 'pages.home'))
         
         flash(error, 'danger')
     
